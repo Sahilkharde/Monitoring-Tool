@@ -1,0 +1,21 @@
+# Render Blueprint — deploy the FastAPI backend only.
+# Dashboard: New → Blueprint → connect this repo → select render.yaml
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: ott-monitoring-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/ping
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: USE_BROWSER_SCAN
+        value: "false"
+      # Add in the Render dashboard (do not put real secrets in git):
+      # SECRET_KEY, GEMINI_API_KEY, DATABASE_URL (optional Postgres), etc.

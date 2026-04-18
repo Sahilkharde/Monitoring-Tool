@@ -1,0 +1,8 @@
+.netlify
+
+backend/.env
+backend/venv/
+backend/__pycache__/
+*.pyc
+.vzy_agent.db
+vzy_agent.db

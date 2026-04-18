@@ -1,0 +1,8 @@
+# Optional: install only if DATABASE_URL uses PostgreSQL.
+#   pip install -r requirements-postgres.txt
+#
+# Use either driver (SQLAlchemy URL scheme differs):
+#   postgresql+psycopg2://USER:PASS@HOST:5432/DB   → psycopg2-binary
+#   postgresql+psycopg://USER:PASS@HOST:5432/DB    → psycopg[binary]  (often better wheels on new Python)
+
+psycopg[binary]>=3.2.0

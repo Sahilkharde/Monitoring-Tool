@@ -1,0 +1,69 @@
+# Builds the SPA with your Render API URL and deploys to GitHub Pages.
+#
+# 1) Repo → Settings → Secrets and variables → Actions → New repository secret:
+#    Name:  VITE_API_BASE_URL
+#    Value: https://YOUR-SERVICE.onrender.com/api   (no trailing slash after "api")
+# 2) Repo → Settings → Pages → Build and deployment → Source: GitHub Actions
+# 3) Push to main/master or run workflow manually.
+
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/github-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Require VITE_API_BASE_URL (static Pages cannot host /api)
+        shell: bash
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "${VITE_API_BASE_URL:-}" ]; then
+            echo "::error::Add GitHub Actions secret VITE_API_BASE_URL (e.g. https://your-app.onrender.com/api). See DEPLOY.md."
+            exit 1
+          fi
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH }}
+        run: npm ci && npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

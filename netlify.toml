@@ -1,0 +1,16 @@
+# Netlify: React SPA from /frontend. API must be hosted separately; set VITE_API_BASE_URL in the UI.
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  base = "frontend"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# React Router / client-side routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
