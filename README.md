@@ -1,4 +1,4 @@
-# AI-OTT-Monitoring-Tool
+# Monitoring-Tool
 
 A full-stack monitoring tool that performs live security, performance, and code quality analysis on any website URL. Built with React + Python/FastAPI.
 
