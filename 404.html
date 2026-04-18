@@ -2,8 +2,8 @@
 <html>
   <head>
     <script>
-      // Redirect all routes to index.html
-      window.location.href = "/Monitoring-Tool/";
+      var path = window.location.pathname.replace("/Monitoring-Tool", "");
+      window.location.href = "/Monitoring-Tool/#" + path;
     </script>
   </head>
 </html>
