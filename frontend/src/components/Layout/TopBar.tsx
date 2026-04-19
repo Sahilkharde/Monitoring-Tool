@@ -14,6 +14,7 @@ import {
   XCircle,
   Info,
   ChevronDown,
+  Menu,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useScanStore } from '../../store/scanStore';
@@ -51,7 +52,7 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
   }, [ref, handler]);
 }
 
-export default function TopBar() {
+export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const currentScan = useScanStore((s) => s.currentScan);
@@ -98,18 +99,28 @@ export default function TopBar() {
       }}
     >
       {/* Left */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        {onOpenMobileNav && (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            className="md:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/[0.06] transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={20} strokeWidth={2} />
+          </button>
+        )}
         {currentScan ? (
           <>
-            <div className="flex items-center gap-2.5">
-              <Globe size={15} className="text-[var(--text-tertiary)]" />
-              <span className={`w-2 h-2 rounded-full ${getStatusColor(currentScan.status)}`} />
-              <span className="text-sm font-medium text-[var(--text-primary)]">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <Globe size={15} className="text-[var(--text-tertiary)] shrink-0" />
+              <span className={`w-2 h-2 rounded-full shrink-0 ${getStatusColor(currentScan.status)}`} />
+              <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                 {currentScan.target_url}
               </span>
             </div>
             {lastScanTime && (
-              <span className="text-[11px] text-[var(--text-tertiary)] font-medium">
+              <span className="hidden sm:inline text-[11px] text-[var(--text-tertiary)] font-medium shrink-0">
                 Last scan: {lastScanTime}
               </span>
             )}

@@ -42,8 +42,11 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #root { min-height: 100vh; }
@@ -88,6 +91,12 @@ button {
   border-radius: 1rem;
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(12px);
+}
+
+/* Default comfortable copy inside cards (pages can override) */
+.card p,
+.card li {
+  line-height: 1.6;
 }
 
 .card-glass {

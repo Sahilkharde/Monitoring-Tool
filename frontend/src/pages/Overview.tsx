@@ -339,15 +339,17 @@ export default function Overview() {
       : null;
 
   return (
-    <div className="space-y-8 max-w-[1400px]">
+    <div className="space-y-10 max-w-[1400px] pb-4">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between border-b border-[var(--border)] pb-8"
       >
-        <div className="min-w-0 space-y-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight">Verification overview</h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-secondary)] leading-relaxed">
+        <div className="min-w-0 space-y-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
+            Verification overview
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-sm text-[var(--text-secondary)] leading-relaxed">
             <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
               <span className="text-[var(--text-tertiary)] shrink-0">Target</span>
               <span className="font-medium text-[var(--text-primary)] truncate">{scan.target_url}</span>
@@ -406,13 +408,13 @@ export default function Overview() {
       </AnimatePresence>
 
       {/* KPI Scores */}
-      <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8">
-        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-9">
+        <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <h3 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <Sparkles size={18} className="text-[var(--accent)] shrink-0" />
             KPI scores
           </h3>
-          <p className="text-sm text-zinc-400 max-w-md leading-relaxed">
+          <p className="text-sm text-zinc-400 max-w-lg leading-relaxed">
             Weighted overall vs. security, performance, and code quality. PASS only when overall is at least {passThreshold}; lower scores
             (for example 79 or 43) are both FAIL because they are below that same target.
           </p>
@@ -448,42 +450,42 @@ export default function Overview() {
       {scan.score_history && scan.score_history.length > 1 && <ScoreTrendChart data={scan.score_history} />}
 
       {/* AI Recommendations + Quick Wins */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <motion.div custom={1} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-6 sm:p-8">
-          <div className="mb-8 space-y-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+        <motion.div custom={1} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-6 sm:p-9">
+          <div className="mb-8 space-y-2">
             <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2.5">
               <Sparkles size={18} className="text-violet-400 shrink-0" />
               Top recommendations
             </h3>
             <p className="text-sm text-zinc-400 leading-relaxed">Highest impact fixes first (up to five).</p>
           </div>
-          <div className="space-y-5">
+          <div className="space-y-6">
             {top5.map((rec, i) => <RecommendationCard key={i} index={i + 1} rec={rec} />)}
             {top5.length === 0 && <p className="text-zinc-500 text-sm py-8 text-center leading-relaxed">No recommendations for this run.</p>}
           </div>
         </motion.div>
 
-        <motion.div custom={2} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8 flex flex-col">
-          <div className="mb-6 space-y-1">
+        <motion.div custom={2} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-9 flex flex-col">
+          <div className="mb-6 space-y-2">
             <div className="flex items-center gap-2.5">
               <Zap className="w-5 h-5 text-amber-400 shrink-0" />
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">Quick wins</h3>
             </div>
             <p className="text-sm text-zinc-400 leading-relaxed">Low-effort items with solid payoff.</p>
           </div>
-          <div className="space-y-3 flex-1">
+          <div className="space-y-4 flex-1">
             {quickWins.length === 0 && (
-              <div className="flex flex-1 min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] px-4 py-8 text-center">
+              <div className="flex flex-1 min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] px-5 py-10 text-center">
                 <Zap className="w-8 h-8 text-zinc-600 mb-3" />
                 <p className="text-sm text-zinc-400 leading-relaxed">None flagged for this scan. Check the list at left for larger fixes.</p>
               </div>
             )}
             {quickWins.slice(0, 6).map((qw, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl p-4 text-sm border border-[var(--border)] bg-[rgba(99,102,241,0.04)]">
+              <div key={i} className="flex items-start gap-3 rounded-xl p-4 sm:p-5 text-sm border border-[var(--border)] bg-[rgba(99,102,241,0.04)]">
                 <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div className="min-w-0 space-y-1">
-                  <p className="text-[var(--text-primary)] font-medium leading-snug">{qw.title}</p>
-                  <p className="text-sm text-zinc-500">{qw.category}</p>
+                <div className="min-w-0 space-y-2">
+                  <p className="text-[var(--text-primary)] font-medium leading-relaxed">{qw.title}</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">{qw.category}</p>
                 </div>
               </div>
             ))}
@@ -492,9 +494,9 @@ export default function Overview() {
       </div>
 
       {/* Projected Score */}
-      <motion.div custom={3} variants={fadeIn} initial="hidden" animate="visible" className="card p-5">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Projected Score After Fixes</h3>
-        <p className="text-xs text-[var(--text-tertiary)] mb-4">
+      <motion.div custom={3} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Projected Score After Fixes</h3>
+        <p className="text-xs text-[var(--text-tertiary)] mb-5 leading-relaxed">
           Overall KPI projected: <strong className="text-violet-400">{projectedOverall.toFixed(1)}</strong>
         </p>
         <ResponsiveContainer width="100%" height={220}>
@@ -511,8 +513,8 @@ export default function Overview() {
       </motion.div>
 
       {/* Success Matrix */}
-      <motion.div custom={4} variants={fadeIn} initial="hidden" animate="visible" className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+      <motion.div custom={4} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8">
+        <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Success Matrix</h3>
           <button onClick={handleExportCSV} className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-lg px-3 py-1.5" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid var(--border)' }}>
             <Download className="w-3.5 h-3.5" />Export CSV
@@ -522,35 +524,35 @@ export default function Overview() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] text-[var(--text-tertiary)] uppercase tracking-wider border-b" style={{ borderColor: 'var(--border)' }}>
-                <th className="py-3 pr-3 w-8">#</th><th className="py-3 pr-3">Issue</th><th className="py-3 pr-3">Category</th>
-                <th className="py-3 pr-3">Severity</th><th className="py-3 pr-3">Impact</th><th className="py-3 pr-3">Post-Fix Gain</th>
-                <th className="py-3 pr-3">Effort</th><th className="py-3">Confidence</th>
+                <th className="py-4 pr-4 w-8">#</th><th className="py-4 pr-4">Issue</th><th className="py-4 pr-4">Category</th>
+                <th className="py-4 pr-4">Severity</th><th className="py-4 pr-4">Impact</th><th className="py-4 pr-4">Post-Fix Gain</th>
+                <th className="py-4 pr-4">Effort</th><th className="py-4">Confidence</th>
               </tr>
             </thead>
             <tbody>
               {recommendations.map((r, i) => (
                 <tr key={i} className="border-b hover:bg-white/[0.01] transition-colors" style={{ borderColor: 'rgba(99,102,241,0.06)' }}>
-                  <td className="py-3 pr-3 text-[var(--text-tertiary)] font-mono text-xs">{i + 1}</td>
-                  <td className="py-3 pr-3 text-[var(--text-primary)] max-w-[200px] truncate text-[13px]">{r.title}</td>
-                  <td className="py-3 pr-3"><CategoryBadge category={r.category} /></td>
-                  <td className="py-3 pr-3"><ScoreBar value={r.risk} /></td>
-                  <td className="py-3 pr-3"><ScoreBar value={r.impact} /></td>
-                  <td className="py-3 pr-3 text-violet-400 font-mono text-xs">+{r.projected_gain ?? 0}</td>
-                  <td className="py-3 pr-3"><EffortBadge effort={r.effort} /></td>
-                  <td className="py-3 text-[var(--text-secondary)] text-xs font-mono">{r.ease}/10</td>
+                  <td className="py-4 pr-4 text-[var(--text-tertiary)] font-mono text-xs align-top">{i + 1}</td>
+                  <td className="py-4 pr-4 text-[var(--text-primary)] max-w-[220px] text-sm leading-relaxed align-top">{r.title}</td>
+                  <td className="py-4 pr-4 align-top"><CategoryBadge category={r.category} /></td>
+                  <td className="py-4 pr-4 align-top"><ScoreBar value={r.risk} /></td>
+                  <td className="py-4 pr-4 align-top"><ScoreBar value={r.impact} /></td>
+                  <td className="py-4 pr-4 text-violet-400 font-mono text-xs align-top">+{r.projected_gain ?? 0}</td>
+                  <td className="py-4 pr-4 align-top"><EffortBadge effort={r.effort} /></td>
+                  <td className="py-4 text-[var(--text-secondary)] text-xs font-mono align-top">{r.ease}/10</td>
                 </tr>
               ))}
-              {recommendations.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-[var(--text-tertiary)] text-sm">No data available.</td></tr>}
+              {recommendations.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-[var(--text-tertiary)] text-sm leading-relaxed">No data available.</td></tr>}
             </tbody>
           </table>
         </div>
       </motion.div>
 
       {/* Findings + Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div custom={5} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <motion.div custom={5} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-6 sm:p-8">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
               Critical & High Findings <span className="text-[var(--text-tertiary)] font-normal">({critHigh.length})</span>
             </h3>
             {critHigh.length > 8 && (
@@ -559,22 +561,22 @@ export default function Overview() {
               </button>
             )}
           </div>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-[min(420px,55vh)] overflow-y-auto pr-1">
             {displayFindings.map((f, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl p-3" style={{ background: 'rgba(99,102,241,0.03)', border: '1px solid var(--border)' }}>
+              <div key={i} className="flex items-start gap-3 rounded-xl p-4 sm:p-5" style={{ background: 'rgba(99,102,241,0.03)', border: '1px solid var(--border)' }}>
                 <SeverityBadge severity={f.severity} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] text-[var(--text-primary)] font-medium">{f.title}</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{f.category}</p>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <p className="text-sm text-[var(--text-primary)] font-medium leading-relaxed">{f.title}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] leading-relaxed">{f.category}</p>
                 </div>
               </div>
             ))}
-            {critHigh.length === 0 && <p className="text-[var(--text-tertiary)] text-sm text-center py-6">No critical or high-severity findings.</p>}
+            {critHigh.length === 0 && <p className="text-[var(--text-tertiary)] text-sm text-center py-8 leading-relaxed">No critical or high-severity findings.</p>}
           </div>
         </motion.div>
 
-        <motion.div custom={6} variants={fadeIn} initial="hidden" animate="visible" className="card p-5">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Severity Distribution</h3>
+        <motion.div custom={6} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 leading-snug">Severity Distribution</h3>
           <SeverityDonut findings={findings} />
         </motion.div>
       </div>
@@ -582,14 +584,14 @@ export default function Overview() {
       {/* Executive Summary */}
       {scan.executive_summary && (
         <motion.div custom={7} variants={fadeIn} initial="hidden" animate="visible" className="card">
-          <button onClick={() => setSummaryOpen(!summaryOpen)} className="flex items-center justify-between w-full p-5 text-left">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Executive Summary</h3>
+          <button onClick={() => setSummaryOpen(!summaryOpen)} className="flex items-center justify-between w-full p-6 sm:p-7 text-left">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">Executive Summary</h3>
             {summaryOpen ? <ChevronUp className="w-4 h-4 text-[var(--text-tertiary)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-tertiary)]" />}
           </button>
           <AnimatePresence>
             {summaryOpen && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <p className="px-5 pb-5 text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">{scan.executive_summary}</p>
+                <p className="px-6 sm:px-7 pb-6 text-sm text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap">{scan.executive_summary}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -605,7 +607,7 @@ function RecommendationCard({ index, rec }: { index: number; rec: Recommendation
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="flex gap-4 rounded-2xl p-5 sm:p-6 border border-[var(--border)] bg-[rgba(99,102,241,0.04)]"
+      className="flex gap-4 rounded-2xl p-5 sm:p-7 border border-[var(--border)] bg-[rgba(99,102,241,0.04)]"
     >
       <span
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold"
@@ -615,7 +617,7 @@ function RecommendationCard({ index, rec }: { index: number; rec: Recommendation
       </span>
       <div className="min-w-0 flex-1 space-y-4">
         <div className="space-y-3">
-          <h4 className="text-base font-semibold text-zinc-100 leading-snug pr-2">{rec.title}</h4>
+          <h4 className="text-base font-semibold text-zinc-100 leading-relaxed pr-2">{rec.title}</h4>
           <div className="flex flex-wrap items-center gap-2">
             <CategoryBadge category={rec.category} />
             {rec.quick_win && (
@@ -629,7 +631,7 @@ function RecommendationCard({ index, rec }: { index: number; rec: Recommendation
           </div>
         </div>
         {rec.description && (
-          <p className="text-sm leading-7 text-zinc-400 line-clamp-3">{rec.description}</p>
+          <p className="text-sm leading-[1.65] text-zinc-400 line-clamp-4">{rec.description}</p>
         )}
         <div className="grid grid-cols-2 gap-3 border-t border-zinc-700/40 pt-4 sm:grid-cols-4 sm:gap-4">
           <div className="rounded-lg bg-black/20 px-3 py-2.5">

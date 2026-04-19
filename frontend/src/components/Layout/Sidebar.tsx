@@ -39,7 +39,14 @@ function getStatusColor(status: string | undefined) {
   }
 }
 
-export default function Sidebar() {
+type SidebarProps = {
+  /** When false on small screens, drawer is off-canvas */
+  mobileOpen?: boolean;
+  /** Close mobile drawer after navigation */
+  onClose?: () => void;
+};
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const currentScan = useScanStore((s) => s.currentScan);
 
@@ -47,7 +54,9 @@ export default function Sidebar() {
     <motion.aside
       animate={{ width: collapsed ? 80 : 288 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="relative flex flex-col h-screen overflow-hidden"
+      className={`relative flex shrink-0 flex-col h-screen overflow-hidden fixed md:relative z-50 max-w-[min(288px,92vw)] transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}
       style={{
         background: 'linear-gradient(180deg, rgba(17,21,37,0.98) 0%, rgba(6,8,15,0.99) 100%)',
         borderRight: '1px solid var(--border)',
@@ -146,6 +155,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => onClose?.()}
             className={({ isActive }) =>
               `relative flex items-center gap-3.5 min-h-[44px] px-4 py-3 rounded-xl text-[14px] font-medium transition-all duration-200 group ${
                 isActive
