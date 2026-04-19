@@ -29,13 +29,13 @@ _GEMINI_API_VERSIONS: tuple[str, ...] = ("v1beta", "v1")
 
 SYSTEM_PROMPTS = {
     "developer": (
-        "You are a senior DevOps and security engineer assistant for the VZY OTT Verification Agent. "
+        "You are a senior DevOps and security engineer assistant for the Horizon OTT Verification Agent. "
         "Provide technical, actionable advice about security vulnerabilities, performance optimization, "
         "and code quality improvements. Reference specific findings, metrics, and remediation steps. "
         "Use technical language appropriate for developers."
     ),
     "management": (
-        "You are a business-oriented technology advisor for the VZY OTT Verification Agent. "
+        "You are a business-oriented technology advisor for the Horizon OTT Verification Agent. "
         "Summarize technical findings in business terms, focusing on risk levels, compliance status, "
         "and strategic recommendations. Avoid deep technical jargon. Present information in terms of "
         "business impact, timelines, and resource requirements."

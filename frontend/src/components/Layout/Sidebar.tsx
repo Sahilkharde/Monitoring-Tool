@@ -87,7 +87,7 @@ export default function Sidebar() {
               className="overflow-hidden whitespace-nowrap min-w-0"
             >
               <div className="text-[15px] font-bold tracking-tight leading-tight gradient-text">
-                Horizon Agent
+                Horizon OTT Agent
               </div>
               <div className="mt-1 text-[11px] font-medium tracking-[0.12em] text-zinc-400 uppercase">
                 OTT Monitor

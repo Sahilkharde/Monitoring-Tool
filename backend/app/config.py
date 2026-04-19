@@ -11,7 +11,7 @@ _DEFAULT_SQLITE_URL = "sqlite:///" + (_BACKEND_DIR / "vzy_agent.db").resolve().a
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Horizon Verification Agent"
+    APP_NAME: str = "Horizon OTT Verification Agent"
     DEBUG: bool = True
 
     # Public POST /api/auth/signup is allowed when this is True OR DEBUG is True.

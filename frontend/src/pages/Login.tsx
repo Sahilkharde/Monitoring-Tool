@@ -109,7 +109,7 @@ export default function Login() {
               draggable={false}
             />
             <h1 className="text-2xl font-bold gradient-text tracking-tight text-center">
-              Horizon Verification Agent
+              Horizon OTT Verification Agent
             </h1>
             <p className="text-sm text-[var(--text-secondary)] mt-2 tracking-wide">
               OTT Platform Security & Performance Monitor
