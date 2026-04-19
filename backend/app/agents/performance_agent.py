@@ -5,6 +5,12 @@ from urllib.parse import urljoin
 
 import httpx
 
+from app.config import settings
+from app.services.pagespeed_insights import (
+    build_performance_result_from_pagespeed,
+    fetch_pagespeed_report,
+)
+
 
 class PerformanceAgent:
     async def analyze(
@@ -14,6 +20,15 @@ class PerformanceAgent:
         snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         findings: list[dict[str, Any]] = []
+
+        # Real Lighthouse: Google PageSpeed Insights API (remote Chrome + Lighthouse in Google cloud).
+        api_key = (settings.GOOGLE_PAGESPEED_API_KEY or "").strip()
+        if settings.USE_PAGESPEED_INSIGHTS and api_key:
+            psi = await fetch_pagespeed_report(url, api_key, platform)
+            if psi:
+                built = build_performance_result_from_pagespeed(psi, url, platform)
+                if built is not None:
+                    return built
 
         if snapshot and snapshot.get("ok") and snapshot.get("html"):
             return self._build_from_snapshot(url, platform, snapshot, findings)

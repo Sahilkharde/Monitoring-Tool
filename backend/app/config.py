@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"
 
+    # Real Lighthouse in Google cloud: PageSpeed Insights API v5 (see services/pagespeed_insights.py).
+    # Create a key in Google Cloud Console and enable "PageSpeed Insights API".
+    GOOGLE_PAGESPEED_API_KEY: Optional[str] = None
+    # When True (default), performance scans use PageSpeed first if GOOGLE_PAGESPEED_API_KEY is set.
+    USE_PAGESPEED_INSIGHTS: bool = True
+
     @field_validator("GEMINI_API_KEY", "GOOGLE_API_KEY", mode="before")
     @classmethod
     def normalize_google_api_keys(cls, v: Any) -> Optional[str]:

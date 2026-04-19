@@ -87,9 +87,16 @@ USE_BROWSER_SCAN=true
 PLAYWRIGHT_TIMEOUT_MS=45000
 DEBUG=false
 ALLOW_PUBLIC_REGISTRATION=false
+
+# Performance — real Lighthouse via Google PageSpeed Insights (remote Chrome + Lighthouse in Google cloud).
+# Enable "PageSpeed Insights API" on the same GCP project, then create/restrict an API key.
+GOOGLE_PAGESPEED_API_KEY=your-google-cloud-api-key
+# USE_PAGESPEED_INSIGHTS=false   # optional: disable and use local snapshot/httpx estimate only
 ```
 
 Primary entry point: [Google AI Studio → API keys](https://aistudio.google.com/apikey).
+
+**Lighthouse scores:** With `GOOGLE_PAGESPEED_API_KEY` set, performance uses **[PageSpeed Insights API v5](https://developers.google.com/speed/docs/insights/v5/get-started)** (official Lighthouse). If the key is missing or the API errors, the scanner **falls back** to the built-in Playwright snapshot or HTTP estimate. PageSpeed calls can take **60–120s** and count toward Google **quota**; enable billing in GCP if you hit limits.
 
 ### If AI Studio only shows keys starting with `AQ.`
 
@@ -110,7 +117,7 @@ You can set either `GEMINI_API_KEY` or `GOOGLE_API_KEY` in `backend/.env`. The b
 Each run is stored with its own `scan_id` and **normalized** `target_url` (adds `https://` if missing). The Overview page shows the **target** and **scan id** for the run you are viewing.
 
 - If two sites **look** similar (same missing security headers, similar bundle heuristics), scores and findings can still **overlap** — that is normal. Compare **Target** and **scan_id** to confirm you opened the right run.
-- For **real browser metrics**, run `playwright install chromium` on the machine hosting the API and keep `USE_BROWSER_SCAN=true`.
+- For **real Lighthouse performance scores**, set **`GOOGLE_PAGESPEED_API_KEY`** (see env block above). For **security/code-quality context** and optional local vitals, run `playwright install chromium` and keep `USE_BROWSER_SCAN=true`.
 - The backend must reach the public internet to fetch Hotstar, Prime, etc. (no offline mock layer).
 
 If you pasted an API key in chat or a ticket, **revoke it** in Google AI Studio and create a new one.

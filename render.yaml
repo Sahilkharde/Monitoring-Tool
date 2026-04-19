@@ -18,4 +18,5 @@ services:
       - key: USE_BROWSER_SCAN
         value: "false"
       # Add in the Render dashboard (do not put real secrets in git):
-      # SECRET_KEY, GEMINI_API_KEY, DATABASE_URL (optional Postgres), etc.
+      # SECRET_KEY, GEMINI_API_KEY, GOOGLE_PAGESPEED_API_KEY (real Lighthouse / PageSpeed API),
+      # DATABASE_URL (optional Postgres), etc.
