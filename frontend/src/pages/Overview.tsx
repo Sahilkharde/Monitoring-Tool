@@ -8,11 +8,12 @@ import {
 import {
   AlertTriangle, TrendingDown, ChevronDown, ChevronUp,
   Download, Zap, Eye, Sparkles,
-  ArrowRight, PlayCircle, Shield, Gauge, Code2, Clock,
+  ArrowRight, PlayCircle, Shield, Gauge, Code2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useScanStore } from '../store/scanStore';
 import type { Recommendation, ScanData } from '../store/scanStore';
+import { api } from '../utils/api';
 import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
 import ScoreTrendChart from '../components/Charts/ScoreTrendChart';
@@ -253,6 +254,17 @@ export default function Overview() {
   const currentScan = useScanStore((s) => s.currentScan);
   const scans = useScanStore((s) => s.scans);
   const [hydrating, setHydrating] = useState(true);
+  const [passThreshold, setPassThreshold] = useState(95);
+
+  useEffect(() => {
+    api
+      .get<{ data: { overall: number } }>('/control/thresholds')
+      .then((r) => {
+        const v = r?.data?.overall;
+        if (typeof v === 'number' && !Number.isNaN(v)) setPassThreshold(v);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -299,7 +311,6 @@ export default function Overview() {
   const performanceScore = Number(scan.performance_score ?? 0);
   const codeQualityScore = Number(scan.code_quality_score ?? 0);
 
-  const passThreshold = 95;
   const overallPass = overallScore >= passThreshold;
 
   const projectedData = [
@@ -402,7 +413,8 @@ export default function Overview() {
             KPI scores
           </h3>
           <p className="text-sm text-zinc-400 max-w-md leading-relaxed">
-            Weighted overall vs. security, performance, and code quality. Pass uses overall ≥ {passThreshold}.
+            Weighted overall vs. security, performance, and code quality. PASS only when overall is at least {passThreshold}; lower scores
+            (for example 79 or 43) are both FAIL because they are below that same target.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10 lg:items-end">

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, User } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
+import horizonLogo from '../assets/horizon-logo.png';
 
 export default function Login() {
   const { login, signup, isAuthenticated } = useAuthStore();
@@ -100,7 +101,7 @@ export default function Login() {
             className="flex flex-col items-center mb-10"
           >
             <img
-              src={`${import.meta.env.BASE_URL}horizon-logo.png`}
+              src={horizonLogo}
               alt="Horizon"
               className="mb-5 w-auto max-w-[min(100%,240px)] max-h-28 object-contain object-center select-none"
               width={240}

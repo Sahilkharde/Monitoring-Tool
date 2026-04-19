@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import horizonLogo from '../../assets/horizon-logo.png';
 import {
   LayoutDashboard,
   Shield,
@@ -63,10 +64,17 @@ export default function Sidebar() {
         <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-xl blur-lg opacity-50" style={{ background: 'var(--gradient-primary)' }} />
           <div
-            className="relative flex items-center justify-center w-11 h-11 rounded-xl"
-            style={{ background: 'var(--gradient-primary)' }}
+            className="relative flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden border border-white/10 bg-[rgba(6,8,15,0.85)]"
+            style={{ background: 'linear-gradient(145deg, rgba(17,21,37,0.9) 0%, rgba(12,14,24,0.95) 100%)' }}
           >
-            <Shield size={22} className="text-white" strokeWidth={1.5} />
+            <img
+              src={horizonLogo}
+              alt=""
+              className="w-9 h-9 object-contain select-none"
+              width={36}
+              height={36}
+              draggable={false}
+            />
           </div>
         </div>
         <AnimatePresence>
