@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,9 +33,22 @@ export default defineConfig(({ mode }) => {
     },
   } as const
 
+  /** GitHub Pages has no SPA rewrite: deep links like /repo/login 404. Copy index.html → 404.html so Pages serves the app shell. */
+  const githubPagesSpaFallback = {
+    name: 'github-pages-spa-fallback',
+    closeBundle() {
+      const dist = path.resolve(configDir, 'dist')
+      const indexHtml = path.join(dist, 'index.html')
+      const notFoundHtml = path.join(dist, '404.html')
+      if (fs.existsSync(indexHtml)) {
+        fs.copyFileSync(indexHtml, notFoundHtml)
+      }
+    },
+  }
+
   return {
     base,
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), githubPagesSpaFallback],
     server: {
       port: 5173,
       proxy: { ...devProxy },
