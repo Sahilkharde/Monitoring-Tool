@@ -31,10 +31,12 @@ export default function AppLayout() {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main
-          className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10"
+          className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10"
           style={{ background: 'var(--bg-primary)' }}
         >
-          <Outlet />
+          <div className="mx-auto w-full max-w-[1600px] min-h-0">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

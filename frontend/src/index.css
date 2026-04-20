@@ -88,9 +88,19 @@ button {
 .card {
   background: var(--gradient-card);
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(12px);
+  /* Lighter blur than before — faster paint on scroll (Sonar-style flat panels use minimal blur) */
+  backdrop-filter: blur(8px);
+  contain: content;
+}
+
+/* Flatter “product” panel — less glass, better FPS */
+.dash-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 /* Default comfortable copy inside cards (pages can override) */

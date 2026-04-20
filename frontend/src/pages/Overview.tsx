@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,8 +16,22 @@ import type { Recommendation, ScanData } from '../store/scanStore';
 import { api } from '../utils/api';
 import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
-import ScoreTrendChart from '../components/Charts/ScoreTrendChart';
 import SeverityDonut from '../components/Charts/SeverityDonut';
+import MetricTile from '../components/dashboard/MetricTile';
+import DashboardSectionHeader from '../components/dashboard/DashboardSectionHeader';
+
+const ScoreTrendChart = lazy(() => import('../components/Charts/ScoreTrendChart'));
+
+function ChartFallback({ height = 280 }: { height?: number }) {
+  return (
+    <div
+      className="dash-panel flex items-center justify-center rounded-xl text-sm text-[var(--text-tertiary)]"
+      style={{ minHeight: height }}
+    >
+      Loading chart…
+    </div>
+  );
+}
 
 function OverviewSkeleton() {
   return (
@@ -244,8 +258,12 @@ function ScoreBar({ value, max = 10 }: { value: number; max?: number }) {
 }
 
 const fadeIn = {
-  hidden: { opacity: 0, y: 12 },
-  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.4, ease: [0.4, 0, 0.2, 1] } }),
+  hidden: { opacity: 0, y: 8 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.04, duration: 0.28, ease: [0.4, 0, 0.2, 1] },
+  }),
 };
 
 export default function Overview() {
@@ -339,14 +357,18 @@ export default function Overview() {
       : null;
 
   return (
-    <div className="space-y-10 max-w-[1400px] pb-4">
+    <div className="w-full space-y-10 pb-4">
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between border-b border-[var(--border)] pb-8"
+        transition={{ duration: 0.22 }}
+        className="flex flex-col gap-6 border-b border-[var(--border)] pb-8 sm:flex-row sm:items-start sm:justify-between"
       >
-        <div className="min-w-0 space-y-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
+        <div className="min-w-0 space-y-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+            Dashboard
+          </p>
+          <h1 className="text-xl font-bold leading-tight tracking-tight text-[var(--text-primary)] sm:text-2xl">
             Verification overview
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-sm text-[var(--text-secondary)] leading-relaxed">
@@ -407,47 +429,56 @@ export default function Overview() {
         )}
       </AnimatePresence>
 
-      {/* KPI Scores */}
-      <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-9">
-        <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <h3 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <Sparkles size={18} className="text-[var(--accent)] shrink-0" />
-            KPI scores
-          </h3>
-          <p className="text-sm text-zinc-400 max-w-lg leading-relaxed">
-            Weighted overall vs. security, performance, and code quality. PASS only when overall is at least {passThreshold}; lower scores
-            (for example 79 or 43) are both FAIL because they are below that same target.
-          </p>
+      {/* KPI — measure tiles (Sonar-style) + gauge breakdown */}
+      <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-6">
+        <DashboardSectionHeader
+          eyebrow="Measures"
+          title="Quality gate & scores"
+          description={`PASS only when overall is at least ${passThreshold}. Weights: security 40%, performance 35%, code quality 25%.`}
+          icon={Sparkles}
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+          <MetricTile
+            label="Overall KPI"
+            score={overallScore}
+            accent="violet"
+            badge={{ text: overallPass ? 'Pass' : 'Fail', ok: overallPass }}
+            hint={`Target ≥ ${passThreshold}`}
+          />
+          <MetricTile label="Security" score={securityScore} accent="red" hint="Weight 40%" />
+          <MetricTile label="Performance" score={performanceScore} accent="cyan" hint="Weight 35%" />
+          <MetricTile label="Code quality" score={codeQualityScore} accent="emerald" hint="Weight 25%" />
         </div>
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10 lg:items-end">
-          <div className="flex flex-col items-center lg:col-span-5">
-            <ScoreGauge score={overallScore} label="Overall KPI" size="lg" subtitle={overallPass ? 'PASS' : 'FAIL'} />
-            <div
-              className={`mt-5 px-4 py-2.5 rounded-xl text-sm font-medium border ${
-                overallPass
-                  ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10'
-                  : 'text-red-300 border-red-500/25 bg-red-500/10'
-              }`}
-            >
-              Target threshold: {passThreshold}
+
+        <div className="dash-panel p-5 sm:p-7">
+          <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+            Breakdown
+          </p>
+          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+            <div className="flex shrink-0 flex-col items-center">
+              <ScoreGauge score={overallScore} label="Overall KPI" size="lg" subtitle={overallPass ? 'PASS' : 'FAIL'} />
             </div>
-          </div>
-          <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 lg:col-span-7 lg:gap-8">
-            <div className="flex justify-center">
-              <ScoreGauge score={securityScore} label="Security (40%)" size="md" />
-            </div>
-            <div className="flex justify-center">
-              <ScoreGauge score={performanceScore} label="Performance (35%)" size="md" />
-            </div>
-            <div className="flex justify-center">
-              <ScoreGauge score={codeQualityScore} label="Code Quality (25%)" size="md" />
+            <div className="grid w-full max-w-xl grid-cols-1 gap-8 sm:max-w-none sm:grid-cols-3 sm:gap-6">
+              <div className="flex justify-center">
+                <ScoreGauge score={securityScore} label="Security (40%)" size="md" />
+              </div>
+              <div className="flex justify-center">
+                <ScoreGauge score={performanceScore} label="Performance (35%)" size="md" />
+              </div>
+              <div className="flex justify-center">
+                <ScoreGauge score={codeQualityScore} label="Code Quality (25%)" size="md" />
+              </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Score Trend */}
-      {scan.score_history && scan.score_history.length > 1 && <ScoreTrendChart data={scan.score_history} />}
+      {/* Score Trend — lazy chart chunk for faster initial paint */}
+      {scan.score_history && scan.score_history.length > 1 && (
+        <Suspense fallback={<ChartFallback height={300} />}>
+          <ScoreTrendChart data={scan.score_history} />
+        </Suspense>
+      )}
 
       {/* AI Recommendations + Quick Wins */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
