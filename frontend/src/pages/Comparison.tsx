@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   GitCompare,
@@ -41,14 +41,53 @@ function scoreTone(score: number | null | undefined): string {
 }
 
 export default function Comparison() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { scans, loadScans } = useScanStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailById, setDetailById] = useState<Record<string, ScanData>>({});
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const hydratedFromQuery = useRef<string | null>(null);
 
   useEffect(() => {
     void loadScans();
   }, [loadScans]);
+
+  /** Open from Competition (or shared link): /compare?ids=scan-a,scan-b */
+  useEffect(() => {
+    const idsParam = searchParams.get('ids');
+    if (!idsParam?.trim()) return;
+    const ids = idsParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length < 2) return;
+
+    const completedList = scans.filter((s) => s.status === 'completed' && s.overall_score != null);
+    const valid = ids.filter((id) => completedList.some((s) => s.scan_id === id));
+    if (valid.length < 2) return;
+
+    if (hydratedFromQuery.current === idsParam) return;
+    hydratedFromQuery.current = idsParam;
+
+    setSelected(new Set(valid));
+    setSearchParams({}, { replace: true });
+
+    void (async () => {
+      setLoadingDetail(true);
+      try {
+        const settled = await Promise.allSettled(
+          valid.map((id) => api.get<ScanData>(`/scans/${id}`).then((row) => ({ id, row }))),
+        );
+        const next: Record<string, ScanData> = {};
+        for (const r of settled) {
+          if (r.status === 'fulfilled') next[r.value.id] = r.value.row;
+        }
+        setDetailById(next);
+      } finally {
+        setLoadingDetail(false);
+      }
+    })();
+  }, [searchParams, scans, setSearchParams]);
 
   const completed = useMemo(
     () => scans.filter((s) => s.status === 'completed' && s.overall_score != null),

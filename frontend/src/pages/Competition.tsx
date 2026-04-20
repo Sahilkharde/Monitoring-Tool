@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Globe, ExternalLink, X, RefreshCw,
@@ -22,9 +23,9 @@ function getDomain(url: string): string {
 }
 
 export default function Competition() {
+  const navigate = useNavigate();
   const { scans, loadScans } = useScanStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [comparing, setComparing] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const [freshUrl, setFreshUrl] = useState('');
   const [showFreshScan, setShowFreshScan] = useState(false);
@@ -69,14 +70,12 @@ export default function Competition() {
     setRescanning(false);
   }, [selected, loadScans]);
 
-  const handleCompare = useCallback(async () => {
+  /** Backend has no /competition/compare — use Compare page with client-side matrix. */
+  const handleCompare = useCallback(() => {
     if (selected.size < 2) return;
-    setComparing(true);
-    try {
-      await api.post('/competition/compare', { scan_ids: Array.from(selected) });
-    } catch { /* silent */ }
-    setComparing(false);
-  }, [selected]);
+    const ids = Array.from(selected);
+    navigate(`/compare?ids=${encodeURIComponent(ids.join(','))}`);
+  }, [selected, navigate]);
 
   const handleFreshScan = useCallback(async () => {
     if (!freshUrl.trim()) return;
@@ -274,15 +273,11 @@ export default function Competition() {
             className="mt-6"
           >
             <button
+              type="button"
               onClick={handleCompare}
-              disabled={comparing}
-              className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors disabled:opacity-50"
+              className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors"
             >
-              {comparing ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Comparing...</>
-              ) : (
-                <><BarChart3 className="h-4 w-4" /> Compare {selected.size} Sites</>
-              )}
+              <BarChart3 className="h-4 w-4" /> Compare {selected.size} Sites
             </button>
           </motion.div>
         )}
