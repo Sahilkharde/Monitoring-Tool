@@ -9,6 +9,7 @@ import {
   Settings,
   FileText,
   Trophy,
+  GitCompare,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
@@ -25,6 +26,7 @@ const navItems = [
   { to: '/code-quality', label: 'Code Quality', icon: Code },
   { to: '/control-center', label: 'Control Center', icon: Settings },
   { to: '/reporting', label: 'Reporting', icon: FileText },
+  { to: '/compare', label: 'Compare', icon: GitCompare },
   { to: '/competition', label: 'Competition', icon: Trophy },
   { to: '/chat', label: 'AI Chat', icon: MessageSquare },
 ];

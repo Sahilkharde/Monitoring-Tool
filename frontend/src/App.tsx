@@ -12,6 +12,7 @@ const CodeQuality = lazy(() => import('./pages/CodeQuality'));
 const ControlCenter = lazy(() => import('./pages/ControlCenter'));
 const Reporting = lazy(() => import('./pages/Reporting'));
 const Competition = lazy(() => import('./pages/Competition'));
+const Comparison = lazy(() => import('./pages/Comparison'));
 const AIChat = lazy(() => import('./pages/AIChat'));
 
 function PageLoader() {
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="code-quality" element={<CodeQuality />} />
             <Route path="control-center" element={<ControlCenter />} />
             <Route path="reporting" element={<Reporting />} />
+            <Route path="compare" element={<Comparison />} />
             <Route path="competition" element={<Competition />} />
             <Route path="chat" element={<AIChat />} />
           </Route>
