@@ -249,6 +249,13 @@ export const useScanStore = create<ScanStore>((set) => ({
       const data = await api.get<ScanData>(`/scans/${scanId}`);
       const active = data.status === 'running' || data.status === 'pending';
       set({ currentScan: data, scanning: active, error: null });
+      if (!active) {
+        try {
+          await useScanStore.getState().loadScans();
+        } catch {
+          /* list refresh is best-effort */
+        }
+      }
     } catch (e) {
       set({ error: (e as Error).message, scanning: false });
     }

@@ -17,9 +17,13 @@ type InputMode = 'single' | 'multiple' | 'source';
 type Platform = 'desktop' | 'mweb' | 'both';
 
 interface ScheduleConfig {
+  /** Required by API when saving a schedule */
+  target_url: string;
   cron: string;
   timezone: string;
   enabled: boolean;
+  agents: string[];
+  platform: string;
 }
 
 interface ThresholdConfig {
@@ -118,7 +122,14 @@ export default function ControlCenter() {
   const [postLoginWaitMs, setPostLoginWaitMs] = useState(2000);
 
   // Schedule state
-  const [schedule, setSchedule] = useState<ScheduleConfig>({ cron: '0 2 * * *', timezone: 'Asia/Kolkata', enabled: false });
+  const [schedule, setSchedule] = useState<ScheduleConfig>({
+    target_url: '',
+    cron: '0 2 * * *',
+    timezone: 'Asia/Kolkata',
+    enabled: false,
+    agents: ['security', 'performance', 'code_quality'],
+    platform: 'both',
+  });
 
   // Thresholds state
   const [thresholds, setThresholds] = useState<ThresholdConfig>({ overall: 95, security: 90, performance: 95, code_quality: 85 });
@@ -140,10 +151,53 @@ export default function ControlCenter() {
 
   useEffect(() => {
     loadScans();
-    api.get<{ uptime_hours: number }>('/system/status').then(d => setUptime(d.uptime_hours)).catch(() => setUptime(null));
-    api.get<ScheduleConfig>('/config/schedule').then(setSchedule).catch(() => {});
-    api.get<ThresholdConfig>('/config/thresholds').then(setThresholds).catch(() => {});
-    api.get<NotifConfig>('/config/notifications').then(setNotifConfig).catch(() => {});
+    api
+      .get<{ uptime_seconds?: number }>('/control/health')
+      .then((d) => setUptime(typeof d.uptime_seconds === 'number' ? Math.floor(d.uptime_seconds / 3600) : null))
+      .catch(() => setUptime(null));
+    api
+      .get<{
+        data: {
+          target_url: string;
+          cron_expression: string;
+          timezone: string;
+          enabled: boolean;
+          agents: string[];
+          platform: string;
+        } | null;
+      }>('/control/schedule')
+      .then((r) => {
+        const d = r.data;
+        if (!d) return;
+        setSchedule({
+          target_url: d.target_url || '',
+          cron: d.cron_expression || '0 2 * * *',
+          timezone: d.timezone || 'Asia/Kolkata',
+          enabled: !!d.enabled,
+          agents: (d.agents?.length ? d.agents : ['security', 'performance', 'code_quality']).map((a) =>
+            a === 'code-quality' ? 'code_quality' : a,
+          ),
+          platform: d.platform || 'both',
+        });
+      })
+      .catch(() => {});
+    api
+      .get<{ data: ThresholdConfig }>('/control/thresholds')
+      .then((r) => {
+        if (r.data) setThresholds(r.data);
+      })
+      .catch(() => {});
+    api
+      .get<{ data: { slack_enabled: boolean; email_enabled: boolean; jira_enabled: boolean } }>('/control/notifications')
+      .then((r) => {
+        if (!r.data) return;
+        setNotifConfig({
+          slack: r.data.slack_enabled,
+          email: r.data.email_enabled,
+          jira: r.data.jira_enabled,
+        });
+      })
+      .catch(() => {});
   }, [loadScans]);
 
   useEffect(() => {
@@ -224,15 +278,60 @@ export default function ControlCenter() {
 
   const handleSave = useCallback(async (endpoint: string, data: unknown) => {
     setSaving(true);
-    try { await api.post(endpoint, data); } catch { /* silent */ } finally { setSaving(false); }
+    try {
+      await api.post(endpoint, data);
+    } catch {
+      /* surfaced via optional toast in future */
+    } finally {
+      setSaving(false);
+    }
   }, []);
+
+  const saveSchedule = useCallback(() => {
+    const body = {
+      target_url: schedule.target_url.trim() || 'https://example.com',
+      cron_expression: schedule.cron,
+      timezone: schedule.timezone,
+      enabled: schedule.enabled,
+      agents: schedule.agents.map((a) => (a === 'code_quality' ? 'code-quality' : a)),
+      platform: schedule.platform,
+    };
+    return handleSave('/control/schedule', body);
+  }, [handleSave, schedule]);
+
+  const saveNotifications = useCallback(() => {
+    const body = {
+      slack_enabled: notifConfig.slack,
+      email_enabled: notifConfig.email,
+      jira_enabled: notifConfig.jira,
+    };
+    return handleSave('/control/notifications', body);
+  }, [handleSave, notifConfig]);
 
   const loadWebhooks = useCallback(async () => {
     setWebhooksLoading(true);
     try {
-      const data = await api.get<{ logs: WebhookLog[] }>('/webhooks/logs');
-      setWebhookLogs(data.logs);
-    } catch { setWebhookLogs([]); } finally { setWebhooksLoading(false); }
+      const data = await api.get<{
+        data: Array<{
+          timestamp: string | null;
+          event: string;
+          source: string;
+          status: WebhookLog['status'];
+        }>;
+      }>('/control/webhooks');
+      setWebhookLogs(
+        (data.data || []).map((row) => ({
+          time: row.timestamp ? formatDistanceToNow(new Date(row.timestamp), { addSuffix: true }) : '—',
+          event: row.event,
+          source: row.source,
+          status: row.status,
+        })),
+      );
+    } catch {
+      setWebhookLogs([]);
+    } finally {
+      setWebhooksLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -656,6 +755,16 @@ export default function ControlCenter() {
                   <h3 className="mb-5 text-lg font-semibold text-[var(--text-primary)]">Scan Schedule</h3>
                   <div className="space-y-5">
                     <div>
+                      <label className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Target URL</label>
+                      <input
+                        value={schedule.target_url}
+                        onChange={(e) => setSchedule((s) => ({ ...s, target_url: e.target.value }))}
+                        placeholder="https://your-site.com"
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors"
+                      />
+                      <p className="mt-1 text-xs text-[var(--text-tertiary)]">Used when the scheduler runs (required to save).</p>
+                    </div>
+                    <div>
                       <label className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Cron Expression</label>
                       <div className="relative">
                         <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
@@ -682,7 +791,8 @@ export default function ControlCenter() {
                       <Toggle enabled={schedule.enabled} onChange={v => setSchedule(s => ({ ...s, enabled: v }))} />
                     </div>
                     <button
-                      onClick={() => handleSave('/config/schedule', schedule)}
+                      type="button"
+                      onClick={() => void saveSchedule()}
                       disabled={saving}
                       className="btn-primary flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#6366f1] via-[#8b5cf6] to-[#a855f7] py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 disabled:opacity-50"
                     >
@@ -721,7 +831,8 @@ export default function ControlCenter() {
                     ))}
                   </div>
                   <button
-                    onClick={() => handleSave('/config/thresholds', thresholds)}
+                    type="button"
+                    onClick={() => void handleSave('/control/thresholds', thresholds)}
                     disabled={saving}
                     className="btn-primary mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#6366f1] via-[#8b5cf6] to-[#a855f7] py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 disabled:opacity-50"
                   >
@@ -756,7 +867,8 @@ export default function ControlCenter() {
                     </div>
                   ))}
                   <button
-                    onClick={() => handleSave('/config/notifications', notifConfig)}
+                    type="button"
+                    onClick={() => void saveNotifications()}
                     disabled={saving}
                     className="btn-primary flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#6366f1] via-[#8b5cf6] to-[#a855f7] py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 disabled:opacity-50"
                   >
