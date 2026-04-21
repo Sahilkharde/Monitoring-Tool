@@ -100,11 +100,7 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
       setShowTargetMenu(false);
       if (scanning) return;
       try {
-        await startScan(url, 'desktop', [...HEADER_SCAN_AGENTS], {
-          use_browser: true,
-          headless: true,
-          fast_scan: true,
-        });
+        await startScan(url, 'desktop', [...HEADER_SCAN_AGENTS], null);
       } catch {
         /* error in store */
       }
@@ -193,8 +189,8 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
                 <div className="border-b border-[var(--border)] px-3 py-2">
                   <p className="text-xs font-semibold text-[var(--text-primary)]">Scanned sites</p>
                   <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-tertiary)]">
-                    Quick scan: desktop, all agents, local performance (skips slow PageSpeed API). Use Control Center
-                    for Desktop + mWeb or full Lighthouse.
+                    Desktop run, all agents. Performance uses Google PageSpeed (Lighthouse) when the API key is set in
+                    backend .env — scans can take 1–2 min. Use Control Center for Desktop + mWeb together.
                   </p>
                 </div>
                 {scannedUrls.length === 0 ? (
