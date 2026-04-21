@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 import {
-  AlertTriangle, TrendingDown, ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp,
   Download, Zap, Eye, Sparkles,
   ArrowRight, PlayCircle, Shield, Gauge, Code2,
 } from 'lucide-react';
@@ -408,54 +408,72 @@ export default function Overview() {
         </Link>
       </motion.div>
 
-      {/* Regressions */}
+      {/* Compared to last scan (backend: regressions) */}
       <AnimatePresence>
         {regressions.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              <h3 className="text-sm font-semibold text-red-400">{regressions.length} Regression{regressions.length !== 1 ? 's' : ''} Detected</h3>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="rounded-xl border border-[var(--border)] bg-[rgba(99,102,241,0.04)] p-4 sm:p-5"
+          >
+            <div className="mb-3 space-y-1">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Compared to your last scan</h3>
+              <p className="text-xs leading-relaxed text-[var(--text-tertiary)]">
+                Same target URL: this run vs the previous completed scan. Lower scores or new high-severity findings are
+                called out below.
+              </p>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {regressions.map((reg, i) => {
                 const isNewFinding = reg.metric === 'New Finding' && reg.title;
                 const isScoreDrop =
                   reg.previous != null && reg.current != null && typeof reg.delta === 'number';
+                const metricLabel =
+                  reg.metric === 'Overall'
+                    ? 'Overall KPI'
+                    : reg.metric
+                      ? `${reg.metric} score`
+                      : 'Score';
+
                 return (
                   <div
                     key={i}
-                    className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-                    style={{ background: 'rgba(239,68,68,0.04)' }}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-3 text-sm sm:px-4"
                   >
-                    <div className="flex min-w-0 items-start gap-2 sm:items-center">
-                      {isNewFinding && reg.severity ? (
-                        <SeverityBadge severity={reg.severity} />
-                      ) : (
-                        <span className="shrink-0 rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-red-300">
-                          Score
-                        </span>
-                      )}
-                      <span className="text-[var(--text-secondary)]">
-                        {isNewFinding ? (
-                          reg.title
-                        ) : isScoreDrop ? (
-                          <>
-                            <span className="font-medium text-[var(--text-primary)]">{reg.metric ?? 'Metric'}</span>
+                    {isNewFinding && reg.severity ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <SeverityBadge severity={reg.severity} />
+                          <p className="text-[var(--text-secondary)]">
+                            <span className="font-medium text-[var(--text-primary)]">New in this scan</span>
                             {' '}
-                            dropped: {reg.previous?.toFixed(1)} → {reg.current?.toFixed(1)}
-                          </>
-                        ) : (
-                          <span className="font-mono text-xs">{reg.metric ?? 'Regression'}</span>
-                        )}
-                      </span>
-                    </div>
-                    {typeof reg.delta === 'number' && (
-                      <div className="flex shrink-0 items-center gap-1 text-red-400 text-xs font-mono">
-                        <TrendingDown className="h-3 w-3" />
-                        {reg.delta > 0 ? '+' : ''}
-                        {reg.delta}
+                            (not seen on last scan): {reg.title}
+                          </p>
+                        </div>
                       </div>
+                    ) : isScoreDrop ? (
+                      <p className="leading-relaxed text-[var(--text-secondary)]">
+                        <span className="font-semibold text-[var(--text-primary)]">{metricLabel}</span> is{' '}
+                        <span className="text-amber-400/95">lower</span> in this scan: from{' '}
+                        <span className="tabular-nums font-medium text-[var(--text-primary)]">
+                          {reg.previous?.toFixed(1)}
+                        </span>{' '}
+                        to{' '}
+                        <span className="tabular-nums font-medium text-[var(--text-primary)]">
+                          {reg.current?.toFixed(1)}
+                        </span>
+                        , compared to your last scan
+                        {typeof reg.delta === 'number' && (
+                          <span className="ml-1.5 font-mono text-xs text-[var(--text-tertiary)]">
+                            (Δ {reg.delta > 0 ? '+' : ''}
+                            {reg.delta})
+                          </span>
+                        )}
+                        .
+                      </p>
+                    ) : (
+                      <p className="font-mono text-xs text-[var(--text-tertiary)]">{reg.metric ?? 'Update'}</p>
                     )}
                   </div>
                 );
