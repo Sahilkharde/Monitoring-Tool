@@ -418,12 +418,48 @@ export default function Overview() {
               <h3 className="text-sm font-semibold text-red-400">{regressions.length} Regression{regressions.length !== 1 ? 's' : ''} Detected</h3>
             </div>
             <div className="space-y-2">
-              {regressions.map((reg, i) => (
-                <div key={i} className="flex items-center justify-between text-sm rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.04)' }}>
-                  <div className="flex items-center gap-2"><SeverityBadge severity={reg.severity} /><span className="text-[var(--text-secondary)]">{reg.title}</span></div>
-                  <div className="flex items-center gap-1 text-red-400 text-xs font-mono"><TrendingDown className="w-3 h-3" />{reg.delta > 0 ? '+' : ''}{reg.delta}</div>
-                </div>
-              ))}
+              {regressions.map((reg, i) => {
+                const isNewFinding = reg.metric === 'New Finding' && reg.title;
+                const isScoreDrop =
+                  reg.previous != null && reg.current != null && typeof reg.delta === 'number';
+                return (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    style={{ background: 'rgba(239,68,68,0.04)' }}
+                  >
+                    <div className="flex min-w-0 items-start gap-2 sm:items-center">
+                      {isNewFinding && reg.severity ? (
+                        <SeverityBadge severity={reg.severity} />
+                      ) : (
+                        <span className="shrink-0 rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-red-300">
+                          Score
+                        </span>
+                      )}
+                      <span className="text-[var(--text-secondary)]">
+                        {isNewFinding ? (
+                          reg.title
+                        ) : isScoreDrop ? (
+                          <>
+                            <span className="font-medium text-[var(--text-primary)]">{reg.metric ?? 'Metric'}</span>
+                            {' '}
+                            dropped: {reg.previous?.toFixed(1)} → {reg.current?.toFixed(1)}
+                          </>
+                        ) : (
+                          <span className="font-mono text-xs">{reg.metric ?? 'Regression'}</span>
+                        )}
+                      </span>
+                    </div>
+                    {typeof reg.delta === 'number' && (
+                      <div className="flex shrink-0 items-center gap-1 text-red-400 text-xs font-mono">
+                        <TrendingDown className="h-3 w-3" />
+                        {reg.delta > 0 ? '+' : ''}
+                        {reg.delta}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}

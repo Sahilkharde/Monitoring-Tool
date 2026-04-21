@@ -22,13 +22,17 @@ export interface Recommendation {
   projected_gain?: number;
 }
 
+/** Matches backend `detect_regressions` in scoring.py — two shapes. */
 export interface Regression {
-  title: string;
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-  delta: number;
-  metric: string;
-  previous_value: number;
-  current_value: number;
+  /** Score drop: e.g. "Security", "Performance", "Overall" */
+  metric?: string;
+  previous?: number;
+  current?: number;
+  /** Negative when score went down */
+  delta?: number;
+  /** New CRITICAL/HIGH finding vs previous scan titles */
+  title?: string;
+  severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 }
 
 export interface SecurityResults {

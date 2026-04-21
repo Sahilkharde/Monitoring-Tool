@@ -137,12 +137,15 @@ async def run_scan(scan_id: str, db: Session) -> None:
         scan.findings = all_findings
         scan.recommendations = generate_recommendations(all_findings)
 
-        previous = (
-            db.query(Scan)
-            .filter(Scan.target_url == scan.target_url, Scan.scan_id != scan_id, Scan.status == "completed")
-            .order_by(Scan.completed_at.desc())
-            .first()
+        prev_q = db.query(Scan).filter(
+            Scan.target_url == scan.target_url,
+            Scan.scan_id != scan_id,
+            Scan.status == "completed",
+            Scan.is_competition == scan.is_competition,
         )
+        if scan.user_id is not None:
+            prev_q = prev_q.filter(Scan.user_id == scan.user_id)
+        previous = prev_q.order_by(Scan.completed_at.desc()).first()
         if previous:
             prev_data = {
                 "security_score": previous.security_score,
