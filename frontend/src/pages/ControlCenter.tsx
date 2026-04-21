@@ -413,8 +413,13 @@ export default function ControlCenter() {
             {/* ── Run Scan ── */}
             {activeTab === 'run-scan' && (
               <motion.div key="run-scan" variants={panelVariants} initial="hidden" animate="visible" exit="exit" transition={{ duration: 0.2 }} className="space-y-5">
-                {/* Scan Target */}
-                <div className="card rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+                {/* Scan Target — z-index when OTT menu open so list stays above Platform/Agents cards on scroll */}
+                <div
+                  className={clsx(
+                    'card overflow-visible rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5',
+                    showOttDropdown && 'relative z-[80]',
+                  )}
+                >
                   <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Scan Target</h3>
                   <div className="mb-4 flex gap-1 rounded-lg bg-[rgba(99,102,241,0.06)] p-1">
                     {(['single', 'multiple', 'source'] as const).map(mode => (
@@ -442,8 +447,9 @@ export default function ControlCenter() {
                           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] py-2.5 pl-10 pr-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] transition-colors"
                         />
                       </div>
-                      <div ref={ottRef} className="relative">
+                      <div ref={ottRef} className="relative z-[90]">
                         <button
+                          type="button"
                           onClick={() => setShowOttDropdown(!showOttDropdown)}
                           className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2.5 text-sm text-[var(--text-secondary)] hover:border-[var(--accent)] transition-colors"
                         >
@@ -451,7 +457,7 @@ export default function ControlCenter() {
                           <ChevronDown className="h-3.5 w-3.5" />
                         </button>
                         {showOttDropdown && (
-                          <div className="absolute right-0 z-20 mt-1 max-h-[min(70vh,22rem)] w-72 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/40">
+                          <div className="absolute right-0 top-full z-[100] mt-1 max-h-[min(70vh,22rem)] w-72 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/40">
                             {OTT_SITES.map((s) => (
                               <button
                                 key={s.url}
@@ -495,7 +501,7 @@ export default function ControlCenter() {
                 </div>
 
                 {/* Platform */}
-                <div className="card rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+                <div className="card relative z-0 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
                   <h3 className="mb-3 text-sm font-semibold text-[var(--text-secondary)]">Platform</h3>
                   <div className="flex gap-2">
                     {([
@@ -521,7 +527,7 @@ export default function ControlCenter() {
                 </div>
 
                 {/* Agents */}
-                <div className="card rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+                <div className="card relative z-0 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
                   <h3 className="mb-3 text-sm font-semibold text-[var(--text-secondary)]">Agents</h3>
                   <div className="flex flex-wrap gap-2">
                     {AGENTS.map(a => (

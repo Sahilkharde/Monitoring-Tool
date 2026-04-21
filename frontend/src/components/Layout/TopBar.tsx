@@ -22,7 +22,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 import type { Notification } from '../../store/notificationStore';
 import { formatDistanceToNow } from 'date-fns';
 import { formatScanPlatform } from '../../utils/scanPlatform';
-import { uniqueScannedUrls, truncateUrl } from '../../utils/scannedUrls';
+import { uniqueScannedUrls, truncateUrl, latestScanForTargetUrl, normalizeUrlForMatch } from '../../utils/scannedUrls';
 
 function getStatusColor(status: string | undefined) {
   switch (status) {
@@ -54,15 +54,13 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
   }, [ref, handler]);
 }
 
-const HEADER_SCAN_AGENTS = ['security', 'performance', 'code_quality'] as const;
-
 export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const currentScan = useScanStore((s) => s.currentScan);
   const scans = useScanStore((s) => s.scans);
   const scanning = useScanStore((s) => s.scanning);
-  const startScan = useScanStore((s) => s.startScan);
+  const loadScan = useScanStore((s) => s.loadScan);
   const loadScans = useScanStore((s) => s.loadScans);
   const { notifications, unreadCount, markAllRead, clearAll } = useNotificationStore();
 
@@ -98,14 +96,15 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
   const handlePickScannedUrl = useCallback(
     async (url: string) => {
       setShowTargetMenu(false);
-      if (scanning) return;
+      const latest = latestScanForTargetUrl(scans, url);
+      if (!latest?.scan_id) return;
       try {
-        await startScan(url, 'desktop', [...HEADER_SCAN_AGENTS], null);
+        await loadScan(latest.scan_id);
       } catch {
         /* error in store */
       }
     },
-    [scanning, startScan],
+    [scans, loadScan],
   );
 
   const roleColor: Record<string, string> = {
@@ -184,13 +183,12 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
                   boxShadow: 'var(--shadow-elevated)',
                 }}
                 role="listbox"
-                aria-label="Scanned sites"
+                aria-label="Scanned sites — open last saved results"
               >
                 <div className="border-b border-[var(--border)] px-3 py-2">
                   <p className="text-xs font-semibold text-[var(--text-primary)]">Scanned sites</p>
                   <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-tertiary)]">
-                    Desktop run, all agents. Performance uses Google PageSpeed (Lighthouse) when the API key is set in
-                    backend .env — scans can take 1–2 min. Use Control Center for Desktop + mWeb together.
+                    Opens the latest saved scan for that site (no new run). Use Control Center to start a new scan.
                   </p>
                 </div>
                 {scannedUrls.length === 0 ? (
@@ -199,23 +197,27 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
                     <span className="font-medium text-[var(--text-primary)]">Control Center</span> first.
                   </div>
                 ) : (
-                  scannedUrls.map((url) => (
-                    <button
-                      key={url}
-                      type="button"
-                      role="option"
-                      disabled={scanning}
-                      onClick={() => void handlePickScannedUrl(url)}
-                      className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(99,102,241,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <span className="break-all font-medium text-[var(--text-primary)]">{url}</span>
-                      {url === displayUrl && (
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--accent-hover)]">
-                          Current view
-                        </span>
-                      )}
-                    </button>
-                  ))
+                  scannedUrls.map((url) => {
+                    const isCurrent =
+                      currentScan &&
+                      normalizeUrlForMatch(currentScan.target_url || '') === normalizeUrlForMatch(url);
+                    return (
+                      <button
+                        key={url}
+                        type="button"
+                        role="option"
+                        onClick={() => void handlePickScannedUrl(url)}
+                        className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(99,102,241,0.08)]"
+                      >
+                        <span className="break-all font-medium text-[var(--text-primary)]">{url}</span>
+                        {isCurrent && (
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--accent-hover)]">
+                            Current view
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
                 )}
               </motion.div>
             )}

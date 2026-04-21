@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,7 +8,7 @@ import {
 import {
   ChevronDown, ChevronUp,
   Download, Zap, Eye, Sparkles,
-  ArrowRight, PlayCircle, Shield, Gauge, Code2,
+  ArrowRight, PlayCircle, Shield, Gauge, Code2, Monitor, Smartphone,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useScanStore } from '../store/scanStore';
@@ -21,6 +21,7 @@ import MetricTile from '../components/dashboard/MetricTile';
 import DashboardSectionHeader from '../components/dashboard/DashboardSectionHeader';
 import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
 import { formatScanPlatform } from '../utils/scanPlatform';
+import { truncateUrl } from '../utils/scannedUrls';
 
 const ScoreTrendChart = lazy(() => import('../components/Charts/ScoreTrendChart'));
 
@@ -62,6 +63,19 @@ function statusLabel(status: string) {
     case 'failed': return 'Failed';
     default: return status;
   }
+}
+
+/** Match MetricTile coloring for table cells. */
+function scoreValueClass(score: number | null | undefined): string {
+  if (score == null || Number.isNaN(score)) return 'text-zinc-500';
+  if (score >= 90) return 'text-emerald-400';
+  if (score >= 70) return 'text-amber-400';
+  if (score >= 50) return 'text-orange-400';
+  return 'text-red-400';
+}
+
+function countSeverity(findings: ScanData['findings'] | undefined, sev: 'CRITICAL' | 'HIGH') {
+  return (findings ?? []).filter((f) => f.severity === sev).length;
 }
 
 function DashboardOnboarding({
@@ -313,6 +327,19 @@ export default function Overview() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [findingsExpanded, setFindingsExpanded] = useState(false);
 
+  const scanGroupPair = useMemo(() => {
+    const sc = currentScan;
+    if (!sc?.scan_group_id) return { desktop: null as ScanData | null, mweb: null as ScanData | null };
+    const gid = sc.scan_group_id;
+    const desktop =
+      scans.find((s) => s.scan_group_id === gid && s.platform === 'desktop') ??
+      (sc.platform === 'desktop' ? sc : null);
+    const mweb =
+      scans.find((s) => s.scan_group_id === gid && s.platform === 'mweb') ??
+      (sc.platform === 'mweb' ? sc : null);
+    return { desktop, mweb };
+  }, [currentScan, scans]);
+
   if (hydrating && !currentScan) {
     return <OverviewSkeleton />;
   }
@@ -498,6 +525,137 @@ export default function Overview() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Desktop + mWeb side-by-side when this run is part of a pair */}
+      {scan.scan_group_id && (scanGroupPair.desktop || scanGroupPair.mweb) && (
+        <motion.div
+          custom={0}
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          <DashboardSectionHeader
+            eyebrow="Comparison"
+            title="Score comparison"
+            description="Same weighting as Overview: 40% / 35% / 25%. Updates live while both runs are in progress."
+            icon={Monitor}
+          />
+          <div className="dash-panel overflow-x-auto rounded-xl border border-[var(--border)] p-4 sm:p-6">
+            <table className="w-full min-w-[320px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className="py-3 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                    Metric
+                  </th>
+                  <th className="px-2 py-3 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                        <Monitor className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                        Desktop
+                      </span>
+                      <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
+                        {truncateUrl(scan.target_url, 44)}
+                      </span>
+                      {scanGroupPair.desktop && scanGroupPair.desktop.status !== 'completed' && (
+                        <span className="text-[10px] font-medium text-amber-400/90">{statusLabel(scanGroupPair.desktop.status)}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-2 py-3 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                        <Smartphone className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                        mWeb
+                      </span>
+                      <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
+                        {truncateUrl(scan.target_url, 44)}
+                      </span>
+                      {scanGroupPair.mweb && scanGroupPair.mweb.status !== 'completed' && (
+                        <span className="text-[10px] font-medium text-amber-400/90">{statusLabel(scanGroupPair.mweb.status)}</span>
+                      )}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-[var(--text-secondary)]">
+                {(
+                  [
+                    { label: 'Overall KPI', dKey: 'overall_score' as const },
+                    { label: 'Security (40%)', dKey: 'security_score' as const },
+                    { label: 'Performance (35%)', dKey: 'performance_score' as const },
+                    { label: 'Code quality (25%)', dKey: 'code_quality_score' as const },
+                  ] as const
+                ).map((row) => (
+                  <tr key={row.label} className="border-b border-[var(--border)]/80 last:border-0">
+                    <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">{row.label}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {scanGroupPair.desktop ? (
+                        <span className={`font-semibold ${scoreValueClass(Number(scanGroupPair.desktop[row.dKey] ?? 0))}`}>
+                          {Number(scanGroupPair.desktop[row.dKey] ?? 0).toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {scanGroupPair.mweb ? (
+                        <span className={`font-semibold ${scoreValueClass(Number(scanGroupPair.mweb[row.dKey] ?? 0))}`}>
+                          {Number(scanGroupPair.mweb[row.dKey] ?? 0).toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-b border-[var(--border)]/80 last:border-0">
+                  <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">Critical findings</td>
+                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                    {scanGroupPair.desktop ? (
+                      <span className={countSeverity(scanGroupPair.desktop.findings, 'CRITICAL') > 0 ? 'text-red-400' : 'text-zinc-500'}>
+                        {countSeverity(scanGroupPair.desktop.findings, 'CRITICAL')}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                    {scanGroupPair.mweb ? (
+                      <span className={countSeverity(scanGroupPair.mweb.findings, 'CRITICAL') > 0 ? 'text-red-400' : 'text-zinc-500'}>
+                        {countSeverity(scanGroupPair.mweb.findings, 'CRITICAL')}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">—</span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">High findings</td>
+                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                    {scanGroupPair.desktop ? (
+                      <span className={countSeverity(scanGroupPair.desktop.findings, 'HIGH') > 0 ? 'text-amber-400' : 'text-zinc-500'}>
+                        {countSeverity(scanGroupPair.desktop.findings, 'HIGH')}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                    {scanGroupPair.mweb ? (
+                      <span className={countSeverity(scanGroupPair.mweb.findings, 'HIGH') > 0 ? 'text-amber-400' : 'text-zinc-500'}>
+                        {countSeverity(scanGroupPair.mweb.findings, 'HIGH')}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">—</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
 
       {/* KPI — measure tiles (Sonar-style) + gauge breakdown */}
       <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-6">

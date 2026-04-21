@@ -303,13 +303,25 @@ export const useScanStore = create<ScanStore>((set) => ({
     try {
       const data = await Promise.all(ids.map((id) => api.get<ScanData>(`/scans/${id}`)));
       const anyActive = data.some((d) => d.status === 'running' || d.status === 'pending');
-      const primary =
-        data.find((d) => d.status === 'running' || d.status === 'pending') ?? data[0];
-      set({
-        currentScan: primary,
-        scanning: anyActive,
-        error: null,
-        lastPollScanIds: anyActive ? ids : null,
+      set((state) => {
+        const mergedScans = [...state.scans];
+        for (const d of data) {
+          const idx = mergedScans.findIndex((x) => x.scan_id === d.scan_id);
+          if (idx >= 0) mergedScans[idx] = d;
+          else mergedScans.unshift(d);
+        }
+        const prevId = state.currentScan?.scan_id;
+        const primary =
+          data.find((d) => d.status === 'running' || d.status === 'pending') ??
+          (prevId ? data.find((d) => d.scan_id === prevId) : undefined) ??
+          data[0];
+        return {
+          currentScan: primary,
+          scanning: anyActive,
+          error: null,
+          lastPollScanIds: anyActive ? ids : null,
+          scans: mergedScans,
+        };
       });
       if (!anyActive) {
         try {
