@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { OTT_SITES } from '../data/ottSites';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -98,7 +99,10 @@ export default function ControlCenter() {
   const [platform, setPlatform] = useState<Platform>('desktop');
   const [selectedAgents, setSelectedAgents] = useState<string[]>(['security', 'performance', 'code_quality']);
   const [showOttDropdown, setShowOttDropdown] = useState(false);
+  /** Fixed position for portaled OTT menu (escapes main scroll clipping). */
+  const [ottMenuPos, setOttMenuPos] = useState<{ top: number; left: number } | null>(null);
   const ottRef = useRef<HTMLDivElement>(null);
+  const ottMenuRef = useRef<HTMLDivElement>(null);
 
   const [browserAdvancedOpen, setBrowserAdvancedOpen] = useState(false);
   const [useBrowser, setUseBrowser] = useState(true);
@@ -190,13 +194,71 @@ export default function ControlCenter() {
       .catch(() => {});
   }, [loadScans]);
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ottRef.current && !ottRef.current.contains(e.target as Node)) setShowOttDropdown(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+  const updateOttMenuPosition = useCallback(() => {
+    if (!ottRef.current) return;
+    const r = ottRef.current.getBoundingClientRect();
+    const menuWidth = 288;
+    const left = Math.max(16, Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 16));
+    setOttMenuPos({ top: r.bottom + 8, left });
   }, []);
+
+  const handleToggleOtt = useCallback(() => {
+    if (showOttDropdown) {
+      setShowOttDropdown(false);
+      setOttMenuPos(null);
+      return;
+    }
+    if (!ottRef.current) return;
+    const r = ottRef.current.getBoundingClientRect();
+    const menuWidth = 288;
+    const left = Math.max(16, Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 16));
+    setOttMenuPos({ top: r.bottom + 8, left });
+    setShowOttDropdown(true);
+  }, [showOttDropdown]);
+
+  useLayoutEffect(() => {
+    if (!showOttDropdown) setOttMenuPos(null);
+  }, [showOttDropdown]);
+
+  useEffect(() => {
+    if (!showOttDropdown) return;
+    const onResizeOrScroll = () => updateOttMenuPosition();
+    window.addEventListener('resize', onResizeOrScroll);
+    window.addEventListener('scroll', onResizeOrScroll, true);
+    return () => {
+      window.removeEventListener('resize', onResizeOrScroll);
+      window.removeEventListener('scroll', onResizeOrScroll, true);
+    };
+  }, [showOttDropdown, updateOttMenuPosition]);
+
+  /** Dim page + allow OTT list to scroll on top of content (menu is portaled to body). */
+  useEffect(() => {
+    if (!showOttDropdown) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showOttDropdown]);
+
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      const t = e.target as Node;
+      if (ottRef.current?.contains(t)) return;
+      if (ottMenuRef.current?.contains(t)) return;
+      setShowOttDropdown(false);
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowOttDropdown(false);
+    }
+    if (!showOttDropdown) return;
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [showOttDropdown]);
 
   const toggleAgent = useCallback((id: string) => {
     setSelectedAgents(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
@@ -414,12 +476,7 @@ export default function ControlCenter() {
             {activeTab === 'run-scan' && (
               <motion.div key="run-scan" variants={panelVariants} initial="hidden" animate="visible" exit="exit" transition={{ duration: 0.2 }} className="space-y-5">
                 {/* Scan Target — z-index when OTT menu open so list stays above Platform/Agents cards on scroll */}
-                <div
-                  className={clsx(
-                    'card overflow-visible rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5',
-                    showOttDropdown && 'relative z-[80]',
-                  )}
-                >
+                <div className="card overflow-visible rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
                   <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Scan Target</h3>
                   <div className="mb-4 flex gap-1 rounded-lg bg-[rgba(99,102,241,0.06)] p-1">
                     {(['single', 'multiple', 'source'] as const).map(mode => (
@@ -447,34 +504,53 @@ export default function ControlCenter() {
                           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] py-2.5 pl-10 pr-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] transition-colors"
                         />
                       </div>
-                      <div ref={ottRef} className="relative z-[90]">
+                      <div ref={ottRef} className="relative shrink-0">
                         <button
                           type="button"
-                          onClick={() => setShowOttDropdown(!showOttDropdown)}
+                          aria-expanded={showOttDropdown}
+                          aria-haspopup="listbox"
+                          onClick={handleToggleOtt}
                           className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2.5 text-sm text-[var(--text-secondary)] hover:border-[var(--accent)] transition-colors"
                         >
                           OTT Sites
                           <ChevronDown className="h-3.5 w-3.5" />
                         </button>
-                        {showOttDropdown && (
-                          <div className="absolute right-0 top-full z-[100] mt-1 max-h-[min(70vh,22rem)] w-72 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/40">
-                            {OTT_SITES.map((s) => (
-                              <button
-                                key={s.url}
-                                type="button"
-                                disabled={scanning || selectedAgents.length === 0}
-                                onClick={() => void handleOttPickAndScan(s.url)}
-                                className="w-full px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(99,102,241,0.06)] disabled:cursor-not-allowed disabled:opacity-50"
+                        {showOttDropdown &&
+                          typeof document !== 'undefined' &&
+                          ottMenuPos &&
+                          createPortal(
+                            <>
+                              <div
+                                className="fixed inset-0 z-[280] bg-black/50 backdrop-blur-[2px]"
+                                aria-hidden
+                              />
+                              <div
+                                ref={ottMenuRef}
+                                role="listbox"
+                                aria-label="OTT preset sites"
+                                className="fixed z-[281] max-h-[min(70vh,22rem)] w-72 overflow-y-auto overscroll-contain rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/50"
+                                style={{ top: ottMenuPos.top, left: ottMenuPos.left }}
                               >
-                                <div className="font-medium text-[var(--text-primary)]">{s.label}</div>
-                                {s.subtitle && (
-                                  <div className="text-[11px] text-[var(--text-tertiary)]">{s.subtitle}</div>
-                                )}
-                                <div className="truncate text-xs text-[var(--text-tertiary)]">{s.url}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                                {OTT_SITES.map((s) => (
+                                  <button
+                                    key={s.url}
+                                    type="button"
+                                    role="option"
+                                    disabled={scanning || selectedAgents.length === 0}
+                                    onClick={() => void handleOttPickAndScan(s.url)}
+                                    className="w-full px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(99,102,241,0.06)] disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    <div className="font-medium text-[var(--text-primary)]">{s.label}</div>
+                                    {s.subtitle && (
+                                      <div className="text-[11px] text-[var(--text-tertiary)]">{s.subtitle}</div>
+                                    )}
+                                    <div className="truncate text-xs text-[var(--text-tertiary)]">{s.url}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </>,
+                            document.body,
+                          )}
                       </div>
                     </div>
                   )}

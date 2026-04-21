@@ -11,12 +11,15 @@ import {
   Square,
   ExternalLink,
   Sparkles,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatDistanceToNow } from 'date-fns';
 import { useScanStore } from '../store/scanStore';
 import type { ScanData } from '../store/scanStore';
 import { api } from '../utils/api';
+import { formatScanPlatform } from '../utils/scanPlatform';
 
 const MAX_COMPARE = 5;
 
@@ -38,6 +41,18 @@ function scoreTone(score: number | null | undefined): string {
   if (score >= 70) return 'text-amber-400';
   if (score >= 50) return 'text-orange-400';
   return 'text-red-400';
+}
+
+function ComparisonColumnPlatformHeader({ scan }: { scan: ScanData }) {
+  const pl = (scan.platform || '').toLowerCase();
+  const label = formatScanPlatform(scan.platform);
+  const Icon = pl === 'mweb' ? Smartphone : pl === 'both' ? Globe : Monitor;
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[rgba(99,102,241,0.12)] px-2.5 py-1.5 text-xs font-bold tracking-wide text-[var(--text-primary)]">
+      <Icon className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
+      <span>{label}</span>
+    </div>
+  );
 }
 
 export default function Comparison() {
@@ -213,9 +228,12 @@ export default function Comparison() {
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Globe className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />
                           <span className="truncate font-medium text-[var(--text-primary)]">{getDomain(scan.target_url)}</span>
+                          <span className="shrink-0 rounded-md border border-[var(--border)] bg-[rgba(99,102,241,0.1)] px-1.5 py-0.5 text-[10px] font-bold text-violet-300">
+                            {formatScanPlatform(scan.platform)}
+                          </span>
                           <a
                             href={scan.target_url}
                             target="_blank"
@@ -292,8 +310,13 @@ export default function Comparison() {
                     </th>
                     {columns.map((c) => (
                       <th key={c.scan_id} className="px-4 py-4 text-center">
-                        <div className="font-semibold text-[var(--text-primary)]">{getDomain(c.target_url)}</div>
-                        <div className="mt-1 truncate text-[11px] font-normal text-[var(--text-tertiary)]">{c.target_url}</div>
+                        <div className="flex flex-col items-center gap-2">
+                          <ComparisonColumnPlatformHeader scan={c} />
+                          <div className="font-semibold text-[var(--text-primary)]">{getDomain(c.target_url)}</div>
+                          <div className="max-w-[min(100%,14rem)] truncate text-[11px] font-normal text-[var(--text-tertiary)]" title={c.target_url}>
+                            {c.target_url}
+                          </div>
+                        </div>
                       </th>
                     ))}
                   </tr>

@@ -549,9 +549,12 @@ export default function Overview() {
                     Metric
                   </th>
                   <th className="px-2 py-3 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
-                        <Monitor className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                    <div className="flex flex-col items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[rgba(99,102,241,0.12)] px-2.5 py-1.5 text-xs font-bold tracking-wide text-[var(--text-primary)]"
+                        title="This column is the Desktop scan"
+                      >
+                        <Monitor className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
                         Desktop
                       </span>
                       <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
@@ -563,9 +566,12 @@ export default function Overview() {
                     </div>
                   </th>
                   <th className="px-2 py-3 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
-                        <Smartphone className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                    <div className="flex flex-col items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[rgba(99,102,241,0.12)] px-2.5 py-1.5 text-xs font-bold tracking-wide text-[var(--text-primary)]"
+                        title="This column is the mobile web (mWeb) scan"
+                      >
+                        <Smartphone className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
                         mWeb
                       </span>
                       <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
