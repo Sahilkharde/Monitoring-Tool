@@ -19,6 +19,8 @@ import SeverityBadge from '../components/Charts/SeverityBadge';
 import SeverityDonut from '../components/Charts/SeverityDonut';
 import MetricTile from '../components/dashboard/MetricTile';
 import DashboardSectionHeader from '../components/dashboard/DashboardSectionHeader';
+import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
+import { formatScanPlatform } from '../utils/scanPlatform';
 
 const ScoreTrendChart = lazy(() => import('../components/Charts/ScoreTrendChart'));
 
@@ -197,6 +199,10 @@ function DashboardOnboarding({
                   <div className="min-w-0 space-y-1">
                     <p className="text-sm font-medium text-[var(--text-primary)] break-all leading-6">{s.target_url}</p>
                     <p className="text-sm text-[var(--text-tertiary)]">
+                      <span className="rounded-md border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+                        {formatScanPlatform(s.platform)}
+                      </span>
+                      <span className="mx-2 text-[var(--border)]">·</span>
                       {s.started_at ? formatDistanceToNow(new Date(s.started_at), { addSuffix: true }) : '—'}
                       <span className="mx-2 text-[var(--border)]">·</span>
                       {statusLabel(s.status)}
@@ -316,7 +322,7 @@ export default function Overview() {
   }
 
   const scan = currentScan;
-  const regressions = scan.regressions ?? [];
+  const compareToLastScan = scan.regressions ?? [];
   const recommendations = scan.recommendations ?? [];
   const findings = scan.findings ?? [];
   const critHigh = findings.filter((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH');
@@ -399,18 +405,21 @@ export default function Overview() {
             </span>
           </div>
         </div>
-        <Link
-          to="/control-center"
-          className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-lg border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-white/[0.04] transition-colors"
-        >
-          New scan
-          <ArrowRight className="h-3.5 w-3.5 opacity-70" />
-        </Link>
+        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+          <ScanPlatformSwitcher className="self-end" />
+          <Link
+            to="/control-center"
+            className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-white/[0.04] transition-colors"
+          >
+            New scan
+            <ArrowRight className="h-3.5 w-3.5 opacity-70" />
+          </Link>
+        </div>
       </motion.div>
 
-      {/* Compared to last scan (backend: regressions) */}
+      {/* Compared to last scan (API field: regressions) */}
       <AnimatePresence>
-        {regressions.length > 0 && (
+        {compareToLastScan.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -420,21 +429,32 @@ export default function Overview() {
             <div className="mb-3 space-y-1">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Compared to your last scan</h3>
               <p className="text-xs leading-relaxed text-[var(--text-tertiary)]">
-                Same target URL: this run vs the previous completed scan. Lower scores or new high-severity findings are
-                called out below.
+                Same target URL: this run vs the previous completed scan. Score drops show how many points lower; new
+                high-severity findings are listed separately.
               </p>
             </div>
             <div className="space-y-3">
-              {regressions.map((reg, i) => {
+              {compareToLastScan.map((reg, i) => {
                 const isNewFinding = reg.metric === 'New Finding' && reg.title;
                 const isScoreDrop =
                   reg.previous != null && reg.current != null && typeof reg.delta === 'number';
-                const metricLabel =
-                  reg.metric === 'Overall'
-                    ? 'Overall KPI'
-                    : reg.metric
-                      ? `${reg.metric} score`
-                      : 'Score';
+                const reduction =
+                  reg.previous != null && reg.current != null
+                    ? Math.max(0, reg.previous - reg.current)
+                    : typeof reg.delta === 'number'
+                      ? Math.abs(reg.delta)
+                      : 0;
+                /** Short name for sentences (e.g. Performance reduced by…) */
+                const areaName =
+                  reg.metric === 'Performance'
+                    ? 'Performance'
+                    : reg.metric === 'Security'
+                      ? 'Security'
+                      : reg.metric === 'Code Quality'
+                        ? 'Code quality'
+                        : reg.metric === 'Overall'
+                          ? 'Overall KPI'
+                          : reg.metric ?? 'Score';
 
                 return (
                   <div
@@ -454,8 +474,11 @@ export default function Overview() {
                       </div>
                     ) : isScoreDrop ? (
                       <p className="leading-relaxed text-[var(--text-secondary)]">
-                        <span className="font-semibold text-[var(--text-primary)]">{metricLabel}</span> is{' '}
-                        <span className="text-amber-400/95">lower</span> in this scan: from{' '}
+                        <span className="font-semibold text-[var(--text-primary)]">{areaName}</span> reduced by{' '}
+                        <span className="tabular-nums font-semibold text-amber-400/95">
+                          {reduction.toFixed(1)}
+                        </span>{' '}
+                        points compared to last scan (from{' '}
                         <span className="tabular-nums font-medium text-[var(--text-primary)]">
                           {reg.previous?.toFixed(1)}
                         </span>{' '}
@@ -463,14 +486,7 @@ export default function Overview() {
                         <span className="tabular-nums font-medium text-[var(--text-primary)]">
                           {reg.current?.toFixed(1)}
                         </span>
-                        , compared to your last scan
-                        {typeof reg.delta === 'number' && (
-                          <span className="ml-1.5 font-mono text-xs text-[var(--text-tertiary)]">
-                            (Δ {reg.delta > 0 ? '+' : ''}
-                            {reg.delta})
-                          </span>
-                        )}
-                        .
+                        ).
                       </p>
                     ) : (
                       <p className="font-mono text-xs text-[var(--text-tertiary)]">{reg.metric ?? 'Update'}</p>

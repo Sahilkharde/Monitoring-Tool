@@ -24,6 +24,8 @@ def migrate_sqlite_schema() -> None:
             return
         if "browser_options" not in col_names:
             conn.execute(text("ALTER TABLE scans ADD COLUMN browser_options TEXT"))
+        if "scan_group_id" not in col_names:
+            conn.execute(text("ALTER TABLE scans ADD COLUMN scan_group_id VARCHAR(64)"))
 
 
 class Base(DeclarativeBase):

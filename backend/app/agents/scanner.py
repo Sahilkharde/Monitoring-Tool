@@ -62,6 +62,17 @@ async def run_scan(scan_id: str, db: Session) -> None:
     completed_agents: list[str] = []
     snapshot: dict[str, Any] | None = None
     browser_opts: dict[str, Any] = dict(scan.browser_options or {})
+    use_fast_performance = bool(browser_opts.get("fast_scan"))
+
+    pl = (scan.platform or "").lower()
+    if pl == "mweb":
+        browser_opts.setdefault("viewport_width", 390)
+        browser_opts.setdefault("viewport_height", 844)
+        browser_opts.setdefault(
+            "user_agent",
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
+            "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        )
 
     try:
         if settings.USE_BROWSER_SCAN and browser_opts.get("use_browser", True):
@@ -97,6 +108,7 @@ async def run_scan(scan_id: str, db: Session) -> None:
                         scan.target_url,
                         scan.platform or "both",
                         snapshot=snapshot,
+                        skip_pagespeed=use_fast_performance,
                     )
                 elif agent_name in ("code-quality", "code_quality"):
                     result = await agent.analyze(scan.target_url, snapshot=snapshot)
@@ -142,6 +154,7 @@ async def run_scan(scan_id: str, db: Session) -> None:
             Scan.scan_id != scan_id,
             Scan.status == "completed",
             Scan.is_competition == scan.is_competition,
+            Scan.platform == scan.platform,
         )
         if scan.user_id is not None:
             prev_q = prev_q.filter(Scan.user_id == scan.user_id)

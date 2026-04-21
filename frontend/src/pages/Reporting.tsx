@@ -81,6 +81,17 @@ function getScoreColor(score: number) {
   return 'text-red-400';
 }
 
+/** Counts from API `regressions` JSON — score drops vs new critical/high findings vs last scan. */
+function lastScanComparisonStats(scan: ScanData) {
+  const rows = scan.regressions ?? [];
+  const scoreRows = rows.filter(
+    (r) => r.previous != null && r.current != null && typeof r.delta === 'number',
+  );
+  const newHighSeverity = rows.filter((r) => r.metric === 'New Finding');
+  const netDelta = scoreRows.reduce((sum, r) => sum + (r.delta ?? 0), 0);
+  return { scoreRows, newHighSeverity, netDelta };
+}
+
 function buildMindMap(scan: ScanData): MindMapNode {
   const criticals = scan.findings.filter(f => f.severity === 'CRITICAL').length;
   const highs = scan.findings.filter(f => f.severity === 'HIGH').length;
@@ -89,6 +100,7 @@ function buildMindMap(scan: ScanData): MindMapNode {
   const secFindings = scan.findings.filter(f => f.category.toLowerCase().includes('security'));
   const perfFindings = scan.findings.filter(f => f.category.toLowerCase().includes('performance'));
   const cqFindings = scan.findings.filter(f => f.category.toLowerCase().includes('code') || f.category.toLowerCase().includes('quality'));
+  const { scoreRows, newHighSeverity, netDelta } = lastScanComparisonStats(scan);
 
   return {
     id: 'root',
@@ -112,10 +124,29 @@ function buildMindMap(scan: ScanData): MindMapNode {
         ],
       },
       {
-        id: 'regressions', label: 'Regressions', value: `${scan.regressions.length}`, color: '#3b82f6',
+        id: 'vs-last-scan',
+        label: 'Compared to last scan',
+        value: `${scan.regressions.length}`,
+        color: '#3b82f6',
         children: [
-          { id: 'reg-new', label: 'New Issues', value: `${scan.regressions.filter(r => r.delta < 0).length}`, color: '#ef4444' },
-          { id: 'reg-resolved', label: 'Resolved', value: `${scan.regressions.filter(r => r.delta > 0).length}`, color: '#22c55e' },
+          {
+            id: 'vs-net',
+            label: 'Net score change',
+            value: `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(1)}`,
+            color: netDelta < 0 ? '#ef4444' : '#22c55e',
+          },
+          {
+            id: 'vs-areas',
+            label: 'Areas with lower scores',
+            value: `${scoreRows.length}`,
+            color: '#f97316',
+          },
+          {
+            id: 'vs-new',
+            label: 'New critical/high findings',
+            value: `${newHighSeverity.length}`,
+            color: '#ef4444',
+          },
         ],
       },
       {
@@ -259,6 +290,8 @@ export default function Reporting() {
     );
   }
 
+  const lastScanStats = lastScanComparisonStats(scan);
+
   return (
     <div className="min-h-0 bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Header */}
@@ -374,7 +407,12 @@ export default function Reporting() {
                         <span className={getScoreColor(overallScore)}>{overallScore.toFixed(1)}</span>.
                         A total of {scan.findings.length} findings were identified across all agents,
                         including {criticalFindings.length} critical/high severity issues requiring immediate attention.
-                        {scan.regressions.length > 0 && ` ${scan.regressions.length} regressions were detected since the last scan.`}
+                        {scan.regressions.length > 0 &&
+                          ` Compared to the last scan: ${lastScanStats.scoreRows.length} score area(s) with lower points` +
+                            (lastScanStats.newHighSeverity.length > 0
+                              ? `, ${lastScanStats.newHighSeverity.length} new critical/high finding(s) not present on the last scan`
+                              : '') +
+                            ` (net score change ${lastScanStats.netDelta >= 0 ? '+' : ''}${lastScanStats.netDelta.toFixed(1)}).`}
                       </p>
                     </motion.div>
                   )}
@@ -410,11 +448,23 @@ export default function Reporting() {
                 </div>
               )}
 
-              {/* Regression Comparison */}
+              {/* Compared to last scan (API field: regressions) */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <RegressionCard label="Score Delta" value={scan.regressions.length > 0 ? '-2.3' : '+0.0'} trend={scan.regressions.length > 0 ? 'down' : 'up'} />
-                <RegressionCard label="New Findings" value={`${scan.regressions.filter(r => r.delta < 0).length}`} trend="down" />
-                <RegressionCard label="Resolved" value={`${scan.regressions.filter(r => r.delta > 0).length}`} trend="up" />
+                <VsLastScanCard
+                  label="Net score change vs last scan"
+                  value={`${lastScanStats.netDelta >= 0 ? '+' : ''}${lastScanStats.netDelta.toFixed(1)}`}
+                  trend={lastScanStats.netDelta >= 0 ? 'up' : 'down'}
+                />
+                <VsLastScanCard
+                  label="Areas with lower scores"
+                  value={`${lastScanStats.scoreRows.length}`}
+                  trend={lastScanStats.scoreRows.length > 0 ? 'down' : 'up'}
+                />
+                <VsLastScanCard
+                  label="New critical/high findings"
+                  value={`${lastScanStats.newHighSeverity.length}`}
+                  trend={lastScanStats.newHighSeverity.length > 0 ? 'down' : 'up'}
+                />
               </div>
 
               {/* Weekly Summary Chart */}
@@ -538,7 +588,7 @@ export default function Reporting() {
                       {[
                         { phase: '0-30 Days', items: 'Address all critical security vulnerabilities and high-priority performance issues.' },
                         { phase: '30-60 Days', items: 'Resolve medium-severity findings and implement monitoring improvements.' },
-                        { phase: '60-90 Days', items: 'Complete code quality enhancements and establish automated regression testing.' },
+                        { phase: '60-90 Days', items: 'Complete code quality enhancements and establish automated performance and security testing.' },
                       ].map(p => (
                         <div key={p.phase} className="rounded-lg bg-[var(--bg-primary)] p-3">
                           <span className="text-xs font-semibold text-blue-400">{p.phase}</span>
@@ -730,7 +780,7 @@ function ScoreCard({ label, score }: { label: string; score: number }) {
   );
 }
 
-function RegressionCard({ label, value, trend }: { label: string; value: string; trend: 'up' | 'down' }) {
+function VsLastScanCard({ label, value, trend }: { label: string; value: string; trend: 'up' | 'down' }) {
   return (
     <div className="rounded-xl border bg-[var(--bg-card)] p-4 text-center" style={{ borderColor: 'var(--border)' }}>
       <p className="text-xs text-[var(--text-tertiary)]">{label}</p>

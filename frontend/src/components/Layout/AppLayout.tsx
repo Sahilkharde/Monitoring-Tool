@@ -6,12 +6,25 @@ import { useScanStore } from '../../store/scanStore';
 
 export default function AppLayout() {
   const loadScans = useScanStore((s) => s.loadScans);
+  const scanning = useScanStore((s) => s.scanning);
+  const currentScan = useScanStore((s) => s.currentScan);
+  const pollScan = useScanStore((s) => s.pollScan);
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     void loadScans();
   }, [loadScans]);
+
+  /** Poll active scan(s) from any page (header quick-scan, Control Center, etc.). */
+  useEffect(() => {
+    if (!scanning || !currentScan) return;
+    void pollScan();
+    const t = setInterval(() => {
+      void pollScan();
+    }, 3000);
+    return () => clearInterval(t);
+  }, [scanning, currentScan?.scan_id, pollScan]);
 
   useEffect(() => {
     setMobileNavOpen(false);

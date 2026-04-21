@@ -20,6 +20,7 @@ import { useScanStore } from '../store/scanStore';
 import type { CodeQualityResults } from '../store/scanStore';
 import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
+import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
 
 type TabId = 'overview' | 'complexity' | 'memory' | 'files' | 'raw';
 
@@ -106,7 +107,7 @@ export default function CodeQuality() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Code2 className="w-5 h-5 text-emerald-400" />
@@ -116,7 +117,10 @@ export default function CodeQuality() {
             Static analysis, dead code, memory leaks, anti-patterns, complexity
           </p>
         </div>
-        <ScoreGauge score={scan.code_quality_score} label="Code Quality" size="sm" />
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <ScanPlatformSwitcher />
+          <ScoreGauge score={scan.code_quality_score} label="Code Quality" size="sm" />
+        </div>
       </div>
 
       {/* Tabs */}

@@ -33,6 +33,8 @@ class Scan(Base):
 
     user_id = Column(Integer, nullable=True)
     is_competition = Column(Boolean, default=False)
+    # When platform "both" is requested, two scans share this id (desktop + mweb).
+    scan_group_id = Column(String(64), nullable=True, index=True)
 
 
 class ScanSchedule(Base):

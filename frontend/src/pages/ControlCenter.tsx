@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { OTT_SITES } from '../data/ottSites';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Calendar, Gauge, Bell, Link2,
@@ -10,6 +11,7 @@ import {
 import clsx from 'clsx';
 import { useScanStore, type BrowserScanOptionsPayload } from '../store/scanStore';
 import { api } from '../utils/api';
+import { formatScanPlatform } from '../utils/scanPlatform';
 import { formatDistanceToNow } from 'date-fns';
 
 type NavTab = 'run-scan' | 'schedule' | 'thresholds' | 'notifications' | 'webhooks';
@@ -52,17 +54,6 @@ const NAV_ITEMS: { id: NavTab; label: string; icon: typeof Play }[] = [
   { id: 'thresholds', label: 'KPI Thresholds', icon: Gauge },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'webhooks', label: 'Webhook Logs', icon: Link2 },
-];
-
-const OTT_SITES = [
-  { label: 'JioCinema', url: 'https://www.jiocinema.com' },
-  { label: 'Hotstar', url: 'https://www.hotstar.com' },
-  { label: 'SonyLIV', url: 'https://www.sonyliv.com' },
-  { label: 'ZEE5', url: 'https://www.zee5.com' },
-  { label: 'MX Player', url: 'https://www.mxplayer.in' },
-  { label: 'Voot', url: 'https://www.voot.com' },
-  { label: 'ALTBalaji', url: 'https://www.altbalaji.com' },
-  { label: 'Eros Now', url: 'https://www.erosnow.com' },
 ];
 
 const TIMEZONES = [
@@ -145,9 +136,8 @@ export default function ControlCenter() {
   const [uptime, setUptime] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const { startScan, scanning, currentScan, abortScan, scans, loadScans, pollScan } = useScanStore();
+  const { startScan, scanning, currentScan, abortActiveScans, scans, loadScans } = useScanStore();
   const scanError = useScanStore((s) => s.error);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadScans();
@@ -201,16 +191,6 @@ export default function ControlCenter() {
   }, [loadScans]);
 
   useEffect(() => {
-    if (scanning && currentScan) {
-      pollRef.current = setInterval(() => { pollScan(currentScan.scan_id); }, 3000);
-    } else if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [scanning, currentScan, pollScan]);
-
-  useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ottRef.current && !ottRef.current.contains(e.target as Node)) setShowOttDropdown(false);
     }
@@ -257,8 +237,7 @@ export default function ControlCenter() {
     const target = inputMode === 'single' ? url : inputMode === 'multiple' ? multiUrls : sourceCode;
     if (!target.trim() || selectedAgents.length === 0) return;
     try {
-      const scanId = await startScan(target, platform, selectedAgents, buildBrowserOptions());
-      pollScan(scanId);
+      await startScan(target, platform, selectedAgents, buildBrowserOptions());
     } catch { /* handled by store */ }
   }, [
     inputMode,
@@ -268,13 +247,27 @@ export default function ControlCenter() {
     platform,
     selectedAgents,
     startScan,
-    pollScan,
     buildBrowserOptions,
   ]);
 
+  /** OTT preset: fill URL and start scan with current platform / agents / browser options */
+  const handleOttPickAndScan = useCallback(
+    async (targetUrl: string) => {
+      setUrl(targetUrl);
+      setShowOttDropdown(false);
+      if (scanning || selectedAgents.length === 0) return;
+      try {
+        await startScan(targetUrl, platform, selectedAgents, buildBrowserOptions());
+      } catch {
+        /* handled by store */
+      }
+    },
+    [scanning, selectedAgents, platform, startScan, buildBrowserOptions],
+  );
+
   const handleAbort = useCallback(async () => {
-    if (currentScan) await abortScan(currentScan.scan_id);
-  }, [currentScan, abortScan]);
+    await abortActiveScans();
+  }, [abortActiveScans]);
 
   const handleSave = useCallback(async (endpoint: string, data: unknown) => {
     setSaving(true);
@@ -458,14 +451,19 @@ export default function ControlCenter() {
                           <ChevronDown className="h-3.5 w-3.5" />
                         </button>
                         {showOttDropdown && (
-                          <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/40">
-                            {OTT_SITES.map(s => (
+                          <div className="absolute right-0 z-20 mt-1 max-h-[min(70vh,22rem)] w-72 overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] py-1 shadow-2xl shadow-black/40">
+                            {OTT_SITES.map((s) => (
                               <button
                                 key={s.url}
-                                onClick={() => { setUrl(s.url); setShowOttDropdown(false); }}
-                                className="w-full px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[rgba(99,102,241,0.06)] transition-colors"
+                                type="button"
+                                disabled={scanning || selectedAgents.length === 0}
+                                onClick={() => void handleOttPickAndScan(s.url)}
+                                className="w-full px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(99,102,241,0.06)] disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <div className="font-medium text-[var(--text-primary)]">{s.label}</div>
+                                {s.subtitle && (
+                                  <div className="text-[11px] text-[var(--text-tertiary)]">{s.subtitle}</div>
+                                )}
                                 <div className="truncate text-xs text-[var(--text-tertiary)]">{s.url}</div>
                               </button>
                             ))}
@@ -734,9 +732,12 @@ export default function ControlCenter() {
                     <h3 className="mb-3 text-sm font-semibold text-[var(--text-secondary)]">Recent Scans</h3>
                     <div className="space-y-1.5">
                       {recentScans.map(s => (
-                        <div key={s.scan_id} className="flex items-center justify-between rounded-lg bg-[rgba(99,102,241,0.06)] px-3 py-2 text-sm">
+                        <div key={s.scan_id} className="flex items-center justify-between gap-2 rounded-lg bg-[rgba(99,102,241,0.06)] px-3 py-2 text-sm">
                           <span className="font-mono text-[var(--text-secondary)]">{s.scan_id.slice(0, 8)}</span>
-                          <span className={clsx('font-semibold', getScoreColor(s.overall_score ?? 0))}>{s.overall_score ?? '—'}</span>
+                          <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                            {formatScanPlatform(s.platform)}
+                          </span>
+                          <span className={clsx('font-semibold tabular-nums', getScoreColor(s.overall_score ?? 0))}>{s.overall_score ?? '—'}</span>
                           <span className="text-xs text-[var(--text-tertiary)]">
                             {s.completed_at ? formatDistanceToNow(new Date(s.completed_at), { addSuffix: true }) : s.status}
                           </span>

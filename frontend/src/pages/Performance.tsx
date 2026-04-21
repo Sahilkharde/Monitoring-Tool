@@ -31,6 +31,7 @@ import {
 import { useScanStore } from '../store/scanStore';
 import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
+import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
 
 type TabId = 'overview' | 'vitals' | 'player' | 'cdn' | 'raw';
 
@@ -208,7 +209,7 @@ export default function Performance() {
       variants={stagger}
     >
       {/* Header */}
-      <motion.div variants={fadeUp} className="flex items-start justify-between">
+      <motion.div variants={fadeUp} className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1.5">
             <div
@@ -227,7 +228,10 @@ export default function Performance() {
             </div>
           </div>
         </div>
-        <ScoreGauge score={scan.performance_score} label="Performance" size="sm" />
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <ScanPlatformSwitcher />
+          <ScoreGauge score={scan.performance_score} label="Performance" size="sm" />
+        </div>
       </motion.div>
 
       {/* Tabs */}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell,
@@ -21,6 +21,8 @@ import { useScanStore } from '../../store/scanStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import type { Notification } from '../../store/notificationStore';
 import { formatDistanceToNow } from 'date-fns';
+import { formatScanPlatform } from '../../utils/scanPlatform';
+import { uniqueScannedUrls, truncateUrl } from '../../utils/scannedUrls';
 
 function getStatusColor(status: string | undefined) {
   switch (status) {
@@ -52,24 +54,31 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
   }, [ref, handler]);
 }
 
+const HEADER_SCAN_AGENTS = ['security', 'performance', 'code_quality'] as const;
+
 export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const currentScan = useScanStore((s) => s.currentScan);
   const scans = useScanStore((s) => s.scans);
   const scanning = useScanStore((s) => s.scanning);
+  const startScan = useScanStore((s) => s.startScan);
+  const loadScans = useScanStore((s) => s.loadScans);
   const { notifications, unreadCount, markAllRead, clearAll } = useNotificationStore();
 
   const [showHealth, setShowHealth] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUser, setShowUser] = useState(false);
+  const [showTargetMenu, setShowTargetMenu] = useState(false);
   const healthRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const urlMenuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(healthRef, () => setShowHealth(false));
   useClickOutside(notifRef, () => setShowNotifications(false));
   useClickOutside(userRef, () => setShowUser(false));
+  useClickOutside(urlMenuRef, () => setShowTargetMenu(false));
 
   const lastScanTime = currentScan?.completed_at
     ? formatDistanceToNow(new Date(currentScan.completed_at), { addSuffix: true })
@@ -81,6 +90,27 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
     : lastRecorded?.started_at
       ? formatDistanceToNow(new Date(lastRecorded.started_at), { addSuffix: true })
       : null;
+
+  const displayScan = currentScan ?? lastRecorded;
+  const scannedUrls = uniqueScannedUrls(scans);
+  const displayUrl = (displayScan?.target_url || '').trim();
+
+  const handlePickScannedUrl = useCallback(
+    async (url: string) => {
+      setShowTargetMenu(false);
+      if (scanning) return;
+      try {
+        await startScan(url, 'desktop', [...HEADER_SCAN_AGENTS], {
+          use_browser: true,
+          headless: true,
+          fast_scan: true,
+        });
+      } catch {
+        /* error in store */
+      }
+    },
+    [scanning, startScan],
+  );
 
   const roleColor: Record<string, string> = {
     admin: 'text-indigo-400 bg-indigo-400/10',
@@ -110,40 +140,91 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => vo
             <Menu size={20} strokeWidth={2} />
           </button>
         )}
-        {currentScan ? (
-          <>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <Globe size={15} className="text-[var(--text-tertiary)] shrink-0" />
-              <span className={`w-2 h-2 rounded-full shrink-0 ${getStatusColor(currentScan.status)}`} />
-              <span className="text-sm font-medium text-[var(--text-primary)] truncate">
-                {currentScan.target_url}
-              </span>
-            </div>
-            {lastScanTime && (
-              <span className="hidden sm:inline text-[11px] text-[var(--text-tertiary)] font-medium shrink-0">
-                Last scan: {lastScanTime}
-              </span>
-            )}
-          </>
-        ) : lastRecorded ? (
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Globe size={15} className="text-[var(--text-tertiary)] shrink-0" />
-            <span className={`w-2 h-2 rounded-full shrink-0 ${getStatusColor(lastRecorded.status)}`} />
-            <span className="text-sm text-[var(--text-secondary)] truncate max-w-[min(100vw-12rem,28rem)]">
-              <span className="text-[var(--text-tertiary)] font-normal">Last verification: </span>
-              <span className="font-medium text-[var(--text-primary)]">{lastRecorded.target_url}</span>
+        <div ref={urlMenuRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              void loadScans();
+              setShowTargetMenu((o) => !o);
+            }}
+            className="flex min-w-0 max-w-full flex-1 items-center gap-2 rounded-lg border border-transparent py-1.5 pl-1 pr-2 text-left transition-colors hover:border-[var(--border)] hover:bg-white/[0.04]"
+            aria-expanded={showTargetMenu}
+            aria-haspopup="listbox"
+          >
+            <Globe size={15} className="shrink-0 text-[var(--text-tertiary)]" />
+            <span className={`h-2 w-2 shrink-0 rounded-full ${getStatusColor(displayScan?.status)}`} />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-primary)]">
+              {displayUrl ? truncateUrl(displayUrl, 56) : 'Select scanned site…'}
             </span>
-            {lastRecordedTime && (
-              <span className="hidden lg:inline text-[11px] text-[var(--text-tertiary)] font-medium shrink-0">
-                {lastRecordedTime}
+            {currentScan?.platform && (
+              <span className="hidden shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] sm:inline">
+                {formatScanPlatform(currentScan.platform)}
               </span>
             )}
-          </div>
-        ) : (
-          <span className="text-sm text-[var(--text-tertiary)]">
-            No verifications yet — run a scan in Control Center
-          </span>
-        )}
+            {scanning && <Loader2 size={14} className="shrink-0 animate-spin text-[var(--accent-hover)]" />}
+            <ChevronDown size={16} className="shrink-0 text-[var(--text-tertiary)]" />
+          </button>
+          {currentScan?.completed_at && lastScanTime && (
+            <span className="hidden shrink-0 text-[11px] font-medium text-[var(--text-tertiary)] sm:inline">
+              Last scan: {lastScanTime}
+            </span>
+          )}
+          {!currentScan && lastRecorded && lastRecordedTime && (
+            <span className="hidden shrink-0 text-[11px] font-medium text-[var(--text-tertiary)] lg:inline">
+              {lastRecordedTime}
+            </span>
+          )}
+          <AnimatePresence>
+            {showTargetMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 top-[calc(100%+6px)] z-[70] max-h-[min(70vh,20rem)] w-[min(100vw-3rem,28rem)] overflow-y-auto rounded-xl py-1 shadow-2xl"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-strong)',
+                  boxShadow: 'var(--shadow-elevated)',
+                }}
+                role="listbox"
+                aria-label="Scanned sites"
+              >
+                <div className="border-b border-[var(--border)] px-3 py-2">
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">Scanned sites</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-tertiary)]">
+                    Quick scan: desktop, all agents, local performance (skips slow PageSpeed API). Use Control Center
+                    for Desktop + mWeb or full Lighthouse.
+                  </p>
+                </div>
+                {scannedUrls.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-[var(--text-secondary)]">
+                    No saved scans yet. Run one from{' '}
+                    <span className="font-medium text-[var(--text-primary)]">Control Center</span> first.
+                  </div>
+                ) : (
+                  scannedUrls.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      role="option"
+                      disabled={scanning}
+                      onClick={() => void handlePickScannedUrl(url)}
+                      className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(99,102,241,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span className="break-all font-medium text-[var(--text-primary)]">{url}</span>
+                      {url === displayUrl && (
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--accent-hover)]">
+                          Current view
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Right */}

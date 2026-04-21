@@ -14,6 +14,7 @@ import { useScanStore } from '../store/scanStore';
 import type { Finding } from '../store/scanStore';
 import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
+import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
 
 type TabId = 'overview' | 'owasp' | 'cve' | 'api' | 'raw';
 
@@ -145,7 +146,7 @@ export default function Security() {
   return (
     <motion.div {...fadeIn} className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Shield className="w-5 h-5 text-[var(--accent)]" />
@@ -155,7 +156,10 @@ export default function Security() {
             OWASP Top 10, API exposure, DRM, tokens, dependencies
           </p>
         </div>
-        <ScoreGauge score={scan.security_score} label="Security" size="sm" />
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <ScanPlatformSwitcher />
+          <ScoreGauge score={scan.security_score} label="Security" size="sm" />
+        </div>
       </div>
 
       {/* Tabs */}

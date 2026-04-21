@@ -18,12 +18,17 @@ class PerformanceAgent:
         url: str,
         platform: str = "both",
         snapshot: dict[str, Any] | None = None,
+        skip_pagespeed: bool = False,
     ) -> dict[str, Any]:
         findings: list[dict[str, Any]] = []
 
         # Real Lighthouse: Google PageSpeed Insights API (remote Chrome + Lighthouse in Google cloud).
         api_key = (settings.GOOGLE_PAGESPEED_API_KEY or "").strip()
-        if settings.USE_PAGESPEED_INSIGHTS and api_key:
+        if (
+            not skip_pagespeed
+            and settings.USE_PAGESPEED_INSIGHTS
+            and api_key
+        ):
             psi = await fetch_pagespeed_report(url, api_key, platform)
             if psi:
                 built = build_performance_result_from_pagespeed(psi, url, platform)

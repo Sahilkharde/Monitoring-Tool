@@ -26,6 +26,8 @@ class BrowserScanOptions(BaseModel):
     user_agent: Optional[str] = None
     navigation_timeout_ms: Optional[int] = None
     login: Optional[LoginFlowConfig] = None
+    #: When True, skip Google PageSpeed Insights (can take 60–120s) and use local snapshot/HTTP analysis.
+    fast_scan: bool = False
 
 
 class ScanRequest(BaseModel):
@@ -39,6 +41,7 @@ class ScanResponse(BaseModel):
     scan_id: str
     target_url: str
     platform: str
+    scan_group_id: Optional[str] = None
     agents: List[str]
     status: str
     started_at: Optional[datetime] = None
@@ -62,6 +65,12 @@ class ScanResponse(BaseModel):
 class ScanListResponse(BaseModel):
     scans: List[ScanResponse]
     total: int
+
+
+class ScanStartResponse(BaseModel):
+    """POST /scans returns one or two rows when platform is ``both`` (desktop + mweb)."""
+
+    scans: List[ScanResponse]
 
 
 class ScheduleRequest(BaseModel):

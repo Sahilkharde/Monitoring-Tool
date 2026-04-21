@@ -22,9 +22,9 @@ export interface Recommendation {
   projected_gain?: number;
 }
 
-/** Matches backend `detect_regressions` in scoring.py — two shapes. */
-export interface Regression {
-  /** Score drop: e.g. "Security", "Performance", "Overall" */
+/** Payload items in `regressions` JSON from API — score change vs last scan, or new finding. */
+export interface ComparisonToLastScanItem {
+  /** Score area: "Security", "Performance", "Code Quality", "Overall" */
   metric?: string;
   previous?: number;
   current?: number;
@@ -147,11 +147,17 @@ export interface BrowserScanOptionsPayload {
   user_agent?: string | null;
   navigation_timeout_ms?: number | null;
   login?: LoginFlowOptions;
+  /** Skip PageSpeed API (slow); use local snapshot/HTTP for performance — set by header quick-scan */
+  fast_scan?: boolean;
 }
 
 export interface ScanData {
   scan_id: string;
   target_url: string;
+  /** desktop | mweb | both — each physical run stores desktop or mweb when you chose Both */
+  platform?: string;
+  /** Present when this run was one of a Desktop + mWeb pair */
+  scan_group_id?: string | null;
   overall_score: number;
   security_score: number;
   performance_score: number;
@@ -161,7 +167,7 @@ export interface ScanData {
   code_quality_results: CodeQualityResults;
   findings: Finding[];
   recommendations: Recommendation[];
-  regressions: Regression[];
+  regressions: ComparisonToLastScanItem[];
   status: 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
   started_at: string;
   completed_at?: string;
@@ -179,6 +185,8 @@ export interface ScanData {
 interface ScanStore {
   currentScan: ScanData | null;
   scans: ScanData[];
+  /** When the last start used Desktop + mWeb, poll these ids until all finish */
+  lastPollScanIds: string[] | null;
   scanning: boolean;
   loading: boolean;
   error: string | null;
@@ -189,12 +197,14 @@ interface ScanStore {
     platform?: string,
     agents?: string[],
     browserOptions?: BrowserScanOptionsPayload | null,
-  ) => Promise<string>;
+  ) => Promise<string[]>;
   loadScan: (scanId: string) => Promise<void>;
   loadScans: () => Promise<void>;
   setCurrentScan: (scan: ScanData) => void;
   abortScan: (scanId: string) => Promise<void>;
-  pollScan: (scanId: string) => Promise<void>;
+  /** Abort the current run (both platforms if applicable) */
+  abortActiveScans: () => Promise<void>;
+  pollScan: (scanId?: string | string[]) => Promise<void>;
   setScan: (scan: ScanData) => void;
   clearScan: () => void;
 }
@@ -202,6 +212,7 @@ interface ScanStore {
 export const useScanStore = create<ScanStore>((set) => ({
   currentScan: null,
   scans: [],
+  lastPollScanIds: null,
   scanning: false,
   loading: false,
   error: null,
@@ -222,9 +233,24 @@ export const useScanStore = create<ScanStore>((set) => ({
     try {
       const body: Record<string, unknown> = { target_url: url, platform, agents };
       if (browserOptions != null) body.browser_options = browserOptions;
-      const scan = await api.post<ScanData>('/scans', body);
-      set({ currentScan: scan, scanning: true, loading: false });
-      return scan.scan_id;
+      const res = await api.post<{ scans: ScanData[] }>('/scans', body);
+      const scans = res.scans ?? [];
+      const ids = scans.map((s) => s.scan_id);
+      const multi = ids.length > 1;
+      set((state) => ({
+        currentScan: scans[0],
+        lastPollScanIds: multi ? ids : null,
+        scanning: true,
+        loading: false,
+        scans:
+          scans.length > 0
+            ? [
+                ...scans,
+                ...state.scans.filter((s) => !scans.some((n) => n.scan_id === s.scan_id)),
+              ]
+            : state.scans,
+      }));
+      return ids;
     } catch (e) {
       set({ scanning: false, loading: false, error: (e as Error).message });
       throw e;
@@ -233,7 +259,11 @@ export const useScanStore = create<ScanStore>((set) => ({
 
   loadScan: async (scanId: string) => {
     const data = await api.get<ScanData>(`/scans/${scanId}`);
-    set({ currentScan: data, scanning: data.status === 'running' || data.status === 'pending' });
+    set({
+      currentScan: data,
+      scanning: data.status === 'running' || data.status === 'pending',
+      lastPollScanIds: null,
+    });
   },
 
   loadScans: async () => {
@@ -245,15 +275,43 @@ export const useScanStore = create<ScanStore>((set) => ({
 
   abortScan: async (scanId: string) => {
     await api.post(`/scans/${scanId}/abort`);
-    set({ scanning: false });
+    set({ scanning: false, lastPollScanIds: null });
   },
 
-  pollScan: async (scanId: string) => {
+  abortActiveScans: async () => {
+    const { lastPollScanIds, currentScan } = useScanStore.getState();
+    const ids = lastPollScanIds ?? (currentScan ? [currentScan.scan_id] : []);
+    for (const id of ids) {
+      try {
+        await api.post(`/scans/${id}/abort`);
+      } catch {
+        /* best-effort */
+      }
+    }
+    set({ scanning: false, lastPollScanIds: null });
+  },
+
+  pollScan: async (scanId?: string | string[]) => {
+    const state = useScanStore.getState();
+    let ids: string[];
+    if (scanId !== undefined) {
+      ids = Array.isArray(scanId) ? scanId : [scanId];
+    } else {
+      ids = state.lastPollScanIds ?? (state.currentScan ? [state.currentScan.scan_id] : []);
+    }
+    if (ids.length === 0) return;
     try {
-      const data = await api.get<ScanData>(`/scans/${scanId}`);
-      const active = data.status === 'running' || data.status === 'pending';
-      set({ currentScan: data, scanning: active, error: null });
-      if (!active) {
+      const data = await Promise.all(ids.map((id) => api.get<ScanData>(`/scans/${id}`)));
+      const anyActive = data.some((d) => d.status === 'running' || d.status === 'pending');
+      const primary =
+        data.find((d) => d.status === 'running' || d.status === 'pending') ?? data[0];
+      set({
+        currentScan: primary,
+        scanning: anyActive,
+        error: null,
+        lastPollScanIds: anyActive ? ids : null,
+      });
+      if (!anyActive) {
         try {
           await useScanStore.getState().loadScans();
         } catch {
@@ -261,10 +319,10 @@ export const useScanStore = create<ScanStore>((set) => ({
         }
       }
     } catch (e) {
-      set({ error: (e as Error).message, scanning: false });
+      set({ error: (e as Error).message, scanning: false, lastPollScanIds: null });
     }
   },
 
   setScan: (scan) => set({ currentScan: scan }),
-  clearScan: () => set({ currentScan: null, error: null, scanning: false }),
+  clearScan: () => set({ currentScan: null, error: null, scanning: false, lastPollScanIds: null }),
 }));

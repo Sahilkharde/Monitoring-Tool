@@ -2,6 +2,27 @@ from typing import Any
 from datetime import datetime, timezone
 
 
+def _last_scan_stats(regressions: list[Any]) -> dict[str, Any]:
+    """Summarize ``detect_regressions`` output: score drops and new critical/high findings."""
+    if not regressions:
+        return {"score_drop_count": 0, "new_critical_high_count": 0, "net_delta": 0.0}
+    score_rows = [
+        r
+        for r in regressions
+        if isinstance(r, dict)
+        and r.get("previous") is not None
+        and r.get("current") is not None
+        and r.get("delta") is not None
+    ]
+    new_rows = [r for r in regressions if isinstance(r, dict) and r.get("metric") == "New Finding"]
+    net = sum(float(r.get("delta") or 0) for r in score_rows)
+    return {
+        "score_drop_count": len(score_rows),
+        "new_critical_high_count": len(new_rows),
+        "net_delta": round(net, 1),
+    }
+
+
 def generate_overview_report(scan: Any) -> dict:
     findings = scan.findings or []
     critical_high = [f for f in findings if f.get("severity") in ("CRITICAL", "HIGH")]
@@ -11,11 +32,7 @@ def generate_overview_report(scan: Any) -> dict:
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
     regressions = scan.regressions or []
-    score_delta = 0
-    new_findings = 0
-    resolved = 0
-    if regressions:
-        score_delta = regressions[0].get("score_delta", 0) if isinstance(regressions, list) and regressions else 0
+    ls_stats = _last_scan_stats(regressions)
 
     return {
         "scan_id": scan.scan_id,
@@ -30,10 +47,10 @@ def generate_overview_report(scan: Any) -> dict:
         "executive_summary": _generate_executive_summary(scan),
         "critical_high_findings": critical_high,
         "severity_distribution": severity_counts,
-        "regression_comparison": {
-            "score_delta": score_delta,
-            "new_findings": len([r for r in regressions if r.get("type") == "new"]),
-            "resolved": len([r for r in regressions if r.get("type") == "resolved"]),
+        "last_scan_comparison": {
+            "net_score_delta": ls_stats["net_delta"],
+            "score_areas_lower": ls_stats["score_drop_count"],
+            "new_critical_high_findings": ls_stats["new_critical_high_count"],
         },
         "regressions": regressions,
         "recommendations": scan.recommendations or [],
@@ -58,7 +75,8 @@ def generate_management_report(scan: Any) -> dict:
 
     trend = "Stable"
     regressions = scan.regressions or []
-    reg_delta = regressions[0].get("score_delta", 0) if regressions and isinstance(regressions[0], dict) else 0
+    ls_stats = _last_scan_stats(regressions)
+    reg_delta = ls_stats["net_delta"]
     if reg_delta > 2:
         trend = "Improving"
     elif reg_delta < -2:
@@ -78,7 +96,7 @@ def generate_management_report(scan: Any) -> dict:
 ## Risk Assessment
 
 - **Critical Findings:** {critical_count}
-- **Regressions:** {len(regressions)}
+- **Compared to last scan:** {len(regressions)} change(s) ({ls_stats["score_drop_count"]} score area(s) lower, {ls_stats["new_critical_high_count"]} new critical/high finding(s). Net score change {ls_stats["net_delta"]:+.1f})
 - **[{'HIGH RISK' if critical_count > 3 else 'MODERATE RISK'}]** {'Performance degradation detected. User experience may be impacted.' if (scan.performance_score or 0) < 70 else 'System is operating within acceptable parameters.'}
 
 ## Critical Issues Requiring Attention
@@ -154,7 +172,10 @@ def generate_mindmap_data(scan: Any) -> dict:
                 },
                 {"label": f"Target Score: 95.0", "type": "executive"},
                 {"label": f"Total Findings: {len(findings)}", "type": "executive"},
-                {"label": f"Regressions: {len(scan.regressions or [])}", "type": "executive"},
+                {
+                    "label": f"Compared to last scan: {len(scan.regressions or [])} item(s)",
+                    "type": "executive",
+                },
                 {
                     "label": f"Critical Vulns: {len([f for f in findings if f.get('severity') == 'CRITICAL'])}",
                     "type": "executive",
@@ -202,6 +223,11 @@ def _generate_executive_summary(scan: Any) -> str:
     ]
 
     if regressions:
-        parts.append(f"WARNING: {len(regressions)} regression(s) detected since last scan.")
+        ls = _last_scan_stats(regressions)
+        parts.append(
+            f"Compared to last scan: {ls['score_drop_count']} score area(s) with lower points, "
+            f"{ls['new_critical_high_count']} new critical/high finding(s). "
+            f"Net score change {ls['net_delta']:+.1f}."
+        )
 
     return " ".join(parts)
