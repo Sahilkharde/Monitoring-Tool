@@ -94,6 +94,10 @@ export interface PerformanceResults {
     fonts: number;
     other: number;
   };
+  /** pagespeed_insights | chromium | httpx | none — how performance was derived */
+  measurement_source?: string;
+  lighthouse_version?: string;
+  pagespeed_analysis_time?: string;
   raw?: unknown;
 }
 

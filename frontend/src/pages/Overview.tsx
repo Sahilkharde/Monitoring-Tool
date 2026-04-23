@@ -8,20 +8,17 @@ import {
 import {
   ChevronDown, ChevronUp,
   Download, Zap, Eye, Sparkles,
-  ArrowRight, PlayCircle, Shield, Gauge, Code2, Monitor, Smartphone,
+  ArrowRight, PlayCircle, Shield, Gauge, Code2, Monitor, Smartphone, Info,
+  AlertTriangle, LayoutGrid,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useScanStore } from '../store/scanStore';
 import type { Recommendation, ScanData } from '../store/scanStore';
 import { api } from '../utils/api';
-import ScoreGauge from '../components/Charts/ScoreGauge';
 import SeverityBadge from '../components/Charts/SeverityBadge';
 import SeverityDonut from '../components/Charts/SeverityDonut';
-import MetricTile from '../components/dashboard/MetricTile';
-import DashboardSectionHeader from '../components/dashboard/DashboardSectionHeader';
 import ScanPlatformSwitcher from '../components/dashboard/ScanPlatformSwitcher';
 import { formatScanPlatform } from '../utils/scanPlatform';
-import { truncateUrl } from '../utils/scannedUrls';
 
 const ScoreTrendChart = lazy(() => import('../components/Charts/ScoreTrendChart'));
 
@@ -76,6 +73,230 @@ function scoreValueClass(score: number | null | undefined): string {
 
 function countSeverity(findings: ScanData['findings'] | undefined, sev: 'CRITICAL' | 'HIGH') {
   return (findings ?? []).filter((f) => f.severity === sev).length;
+}
+
+/** Human-readable line for how the performance pillar was produced (API `measurement_source`). */
+function performanceSourceExplanation(perf: ScanData['performance_results'] | undefined): string {
+  const src = perf?.measurement_source;
+  if (src === 'pagespeed_insights') {
+    const v = perf?.lighthouse_version;
+    return v
+      ? `Measured — Google PageSpeed Insights (Lighthouse ${v} in Google’s cloud) when the API key is set.`
+      : 'Measured — Google PageSpeed Insights (Lighthouse in Google’s cloud) when the API key is set.';
+  }
+  if (src === 'chromium') {
+    return 'Estimated — Lighthouse-style category scores from a local browser capture (heuristic, not a full remote Lighthouse run).';
+  }
+  if (src === 'httpx') {
+    return 'Estimated — from HTTP/HTML analysis without a full browser (Lighthouse-style scores are approximate).';
+  }
+  if (src === 'none') {
+    return 'Partial — performance data was limited or unavailable for this run.';
+  }
+  return 'See the Performance page for how this run was scored.';
+}
+
+function performanceSourcePillLabel(perf: ScanData['performance_results'] | undefined): { short: string; long: string } {
+  const long = performanceSourceExplanation(perf);
+  const src = perf?.measurement_source;
+  if (src === 'pagespeed_insights') {
+    return { short: 'PageSpeed / Lighthouse', long };
+  }
+  if (src === 'chromium') {
+    return { short: 'Browser estimate', long };
+  }
+  if (src === 'httpx') {
+    return { short: 'HTTP estimate', long };
+  }
+  if (src === 'none') {
+    return { short: 'Performance partial', long };
+  }
+  return { short: 'See Performance page', long };
+}
+
+function scoreBarBg(score: number): string {
+  if (score >= 90) return 'bg-emerald-500';
+  if (score >= 70) return 'bg-amber-400';
+  if (score >= 50) return 'bg-orange-400';
+  return 'bg-red-500';
+}
+
+function OverviewKpiCard({
+  label,
+  score,
+  weight,
+  subtitle,
+  passBadge,
+}: {
+  label: string;
+  score: number;
+  weight?: string;
+  subtitle: string;
+  passBadge?: { ok: boolean };
+}) {
+  const pct = Math.max(0, Math.min(100, score));
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">{label}</p>
+        <div className="flex items-center gap-1.5">
+          {passBadge && (
+            <span
+              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                passBadge.ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+              }`}
+            >
+              {passBadge.ok ? 'Pass' : 'Fail'}
+            </span>
+          )}
+          {weight && (
+            <span className="shrink-0 rounded-md border border-[var(--border)] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+              {weight}
+            </span>
+          )}
+        </div>
+      </div>
+      <p className={`mt-2 text-3xl font-bold tabular-nums sm:text-4xl ${scoreValueClass(score)}`}>{score.toFixed(1)}</p>
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+        <div className={`h-full rounded-full ${scoreBarBg(score)}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-[var(--text-tertiary)]">{subtitle}</p>
+    </div>
+  );
+}
+
+function ScanStatusStrip({ scan }: { scan: ScanData }) {
+  const when = scan.completed_at
+    ? formatDistanceToNow(new Date(scan.completed_at), { addSuffix: true })
+    : scan.started_at
+      ? formatDistanceToNow(new Date(scan.started_at), { addSuffix: true })
+      : '—';
+  const shortId = scan.scan_id.length > 18 ? `${scan.scan_id.slice(0, 14)}…` : scan.scan_id;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-3.5 sm:gap-x-6"
+      role="status"
+    >
+      <div className="flex min-w-0 max-w-full flex-[1_1_14rem] items-baseline gap-2 sm:flex-[2_1_20rem]">
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Target</span>
+        <span className="truncate font-medium text-sm text-[var(--text-primary)]" title={scan.target_url}>
+          {scan.target_url}
+        </span>
+      </div>
+      <span className="hidden h-4 w-px bg-[var(--border)] sm:block" aria-hidden />
+      <div className="flex items-center gap-2">
+        {scan.status === 'completed' && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+            <span aria-hidden>✓</span> Completed
+          </span>
+        )}
+        {scan.status === 'failed' && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-400">Failed</span>
+        )}
+        {(scan.status === 'running' || scan.status === 'pending') && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">In progress</span>
+        )}
+        {scan.status === 'aborted' && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-zinc-500/15 px-2.5 py-1 text-xs font-semibold text-zinc-400">Aborted</span>
+        )}
+      </div>
+      <span className="hidden h-4 w-px bg-[var(--border)] sm:block" aria-hidden />
+      <div className="text-xs text-[var(--text-tertiary)]">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Finished</span>{' '}
+        <span className="text-[var(--text-secondary)]">{when}</span>
+      </div>
+      {typeof scan.duration_ms === 'number' && scan.duration_ms > 0 && (
+        <>
+          <span className="hidden h-4 w-px bg-[var(--border)] sm:block" aria-hidden />
+          <div className="text-xs text-[var(--text-tertiary)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Run</span>{' '}
+            <span className="font-mono text-[var(--text-secondary)]">{(scan.duration_ms / 1000).toFixed(1)}s</span>
+          </div>
+        </>
+      )}
+      <span className="hidden h-4 w-px bg-[var(--border)] sm:block" aria-hidden />
+      <div className="min-w-0 text-xs">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Scan ID</span>{' '}
+        <span className="font-mono text-[11px] text-zinc-500" title={scan.scan_id}>
+          {shortId}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function InfoPillsRow({ scan }: { scan: ScanData }) {
+  const perfPill = performanceSourcePillLabel(scan.performance_results);
+  const weightsTitle =
+    'Overall KPI uses the same weights as the API: security 40%, performance 35%, code quality 25%. Each pillar score is an agent output for this run.';
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="region" aria-label="Score methodology (short)">
+      <div
+        className="group flex min-h-[3.25rem] items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[rgba(99,102,241,0.08)] px-3 py-2.5"
+        title={weightsTitle}
+      >
+        <LayoutGrid className="h-4 w-4 shrink-0 text-violet-400" aria-hidden />
+        <p className="min-w-0 text-[13px] font-medium leading-snug text-[var(--text-primary)]">
+          40% / 35% / 25% <span className="font-normal text-[var(--text-tertiary)]">KPI mix</span>
+        </p>
+      </div>
+      <div
+        className="flex min-h-[3.25rem] items-center gap-2.5 rounded-xl border border-[var(--border)] bg-emerald-500/8 px-3 py-2.5"
+        title={perfPill.long}
+      >
+        <Gauge className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+        <p className="min-w-0 text-[13px] font-medium leading-snug text-[var(--text-primary)]">
+          {perfPill.short} <span className="font-normal text-[var(--text-tertiary)]">· perf.</span>
+        </p>
+      </div>
+      <div
+        className="flex min-h-[3.25rem] items-center gap-2.5 rounded-xl border border-[var(--border)] bg-amber-500/8 px-3 py-2.5"
+        title="Projected scores and recommendation “gains” are summed heuristics for planning — not a guarantee after fixes."
+      >
+        <Info className="h-4 w-4 shrink-0 text-amber-400" aria-hidden />
+        <p className="min-w-0 text-[13px] font-medium leading-snug text-[var(--text-primary)]">
+          Projections <span className="font-normal text-amber-400/90">illustrative only</span>
+        </p>
+      </div>
+      <details className="col-span-1 sm:col-span-3 sm:hidden">
+        <summary className="cursor-pointer list-none text-center text-xs font-medium text-violet-400/90">Full methodology</summary>
+        <p className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
+          {weightsTitle} Performance: {perfPill.long}
+        </p>
+      </details>
+    </div>
+  );
+}
+
+function FindingsHighlightCards({ critical: c, high: h }: { critical: number; high: number }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="flex flex-col rounded-2xl border border-red-500/25 bg-red-500/5 p-5 sm:p-6">
+        <div className="mb-2 flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/15">
+            <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden />
+          </div>
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Critical findings</span>
+        </div>
+        <p className={`text-4xl font-bold tabular-nums sm:text-5xl ${c > 0 ? 'text-red-400' : 'text-zinc-500'}`}>{c}</p>
+        <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+          {c === 0 ? 'No critical issues in this run.' : 'Address critical items first.'}
+        </p>
+      </div>
+      <div className="flex flex-col rounded-2xl border border-amber-500/25 bg-amber-500/5 p-5 sm:p-6">
+        <div className="mb-2 flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15">
+            <AlertTriangle className="h-5 w-5 text-amber-400" aria-hidden />
+          </div>
+          <span className="text-sm font-semibold text-[var(--text-primary)]">High findings</span>
+        </div>
+        <p className={`text-4xl font-bold tabular-nums sm:text-5xl ${h > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>{h}</p>
+        <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+          {h === 0 ? 'No high-severity issues.' : 'Require attention soon.'}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function DashboardOnboarding({
@@ -282,7 +503,7 @@ const fadeIn = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.04, duration: 0.28, ease: [0.4, 0, 0.2, 1] },
+    transition: { delay: i * 0.04, duration: 0.28, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
   }),
 };
 
@@ -352,6 +573,8 @@ export default function Overview() {
   const compareToLastScan = scan.regressions ?? [];
   const recommendations = scan.recommendations ?? [];
   const findings = scan.findings ?? [];
+  const criticalCount = countSeverity(findings, 'CRITICAL');
+  const highCount = countSeverity(findings, 'HIGH');
   const critHigh = findings.filter((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH');
   const displayFindings = findingsExpanded ? critHigh : critHigh.slice(0, 8);
   const top5 = recommendations.slice(0, 5);
@@ -383,66 +606,47 @@ export default function Overview() {
     URL.revokeObjectURL(a.href);
   };
 
-  const scanMeta = scan.completed_at
-    ? `Completed ${formatDistanceToNow(new Date(scan.completed_at), { addSuffix: true })}`
-    : scan.started_at
-      ? `Started ${formatDistanceToNow(new Date(scan.started_at), { addSuffix: true })}`
-      : null;
+  const securityFindingLine =
+    highCount === 0 ? 'No high-severity findings.' : `${highCount} high-severity finding${highCount === 1 ? '' : 's'}.`;
+  const perfSubtitle =
+    performanceScore < 50
+      ? 'Needs improvement — prioritize speed work.'
+      : performanceScore < 70
+        ? 'Room to improve key metrics.'
+        : 'Solid performance profile.';
+  const codeSubtitle =
+    codeQualityScore >= 95 ? 'No major issues detected.' : 'Review the Code quality page for details.';
+  const overallSub =
+    scan.scan_group_id && scanGroupPair.desktop && scanGroupPair.mweb
+      ? 'Compare Desktop vs mWeb in the table below.'
+      : `${formatScanPlatform(scan.platform)} · target ≥ ${passThreshold} to pass.`;
 
   return (
-    <div className="w-full space-y-10 pb-4">
+    <div className="mx-auto w-full max-w-6xl space-y-10 pb-10 lg:space-y-12">
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22 }}
-        className="flex flex-col gap-6 border-b border-[var(--border)] pb-8 sm:flex-row sm:items-start sm:justify-between"
+        className="flex flex-col gap-4 border-b border-[var(--border)] pb-6 sm:flex-row sm:items-start sm:justify-between"
       >
-        <div className="min-w-0 space-y-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            Dashboard
-          </p>
-          <h1 className="text-xl font-bold leading-tight tracking-tight text-[var(--text-primary)] sm:text-2xl">
-            Verification overview
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-sm text-[var(--text-secondary)] leading-relaxed">
-            <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
-              <span className="text-[var(--text-tertiary)] shrink-0">Target</span>
-              <span className="font-medium text-[var(--text-primary)] truncate">{scan.target_url}</span>
-            </span>
-            <span className="hidden sm:inline text-[var(--border)]">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${scan.status === 'completed' ? 'bg-emerald-400' : scan.status === 'failed' ? 'bg-red-400' : 'bg-amber-400'}`} />
-              <span className="capitalize">{statusLabel(scan.status)}</span>
-            </span>
-            {scanMeta && (
-              <>
-                <span className="hidden sm:inline text-[var(--border)]">·</span>
-                <span className="text-[var(--text-tertiary)] text-xs sm:text-sm">{scanMeta}</span>
-              </>
-            )}
-            {typeof scan.duration_ms === 'number' && scan.duration_ms > 0 && (
-              <>
-                <span className="hidden sm:inline text-[var(--border)]">·</span>
-                <span className="text-[var(--text-tertiary)] text-xs sm:text-sm font-mono">{(scan.duration_ms / 1000).toFixed(1)}s run</span>
-              </>
-            )}
-            <span className="hidden sm:inline text-[var(--border)]">·</span>
-            <span className="text-[11px] font-mono text-zinc-500" title="Use this to confirm you are viewing the correct saved run">
-              {scan.scan_id}
-            </span>
-          </div>
+        <div className="min-w-0 space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Dashboard</p>
+          <h1 className="text-xl font-bold leading-tight tracking-tight text-[var(--text-primary)] sm:text-2xl">Verification overview</h1>
         </div>
-        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+        <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
           <ScanPlatformSwitcher className="self-end" />
           <Link
             to="/control-center"
-            className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-white/[0.04] transition-colors"
+            className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-white/[0.04]"
           >
             New scan
             <ArrowRight className="h-3.5 w-3.5 opacity-70" />
           </Link>
         </div>
       </motion.div>
+
+      <ScanStatusStrip scan={scan} />
+      <InfoPillsRow scan={scan} />
 
       {/* Compared to last scan (API field: regressions) */}
       <AnimatePresence>
@@ -526,76 +730,79 @@ export default function Overview() {
         )}
       </AnimatePresence>
 
-      {/* Desktop + mWeb side-by-side when this run is part of a pair */}
+      {/* Primary: four KPI cards + findings highlight */}
+      <motion.div
+        custom={0}
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
+        <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)] sm:text-xl">Score summary</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <OverviewKpiCard
+            label="Overall KPI"
+            score={overallScore}
+            subtitle={overallSub}
+            passBadge={{ ok: overallPass }}
+          />
+          <OverviewKpiCard
+            label="Security"
+            score={securityScore}
+            weight="40%"
+            subtitle={securityFindingLine}
+          />
+          <OverviewKpiCard label="Performance" score={performanceScore} weight="35%" subtitle={perfSubtitle} />
+          <OverviewKpiCard label="Code quality" score={codeQualityScore} weight="25%" subtitle={codeSubtitle} />
+        </div>
+        <FindingsHighlightCards critical={criticalCount} high={highCount} />
+      </motion.div>
+
+      {/* Platform comparison (secondary) — Desktop vs mWeb */}
       {scan.scan_group_id && (scanGroupPair.desktop || scanGroupPair.mweb) && (
         <motion.div
           custom={0}
           variants={fadeIn}
           initial="hidden"
           animate="visible"
-          className="space-y-6"
+          className="space-y-4"
         >
-          <DashboardSectionHeader
-            eyebrow="Comparison"
-            title="Score comparison"
-            description="Same weighting as Overview: 40% / 35% / 25%. Updates live while both runs are in progress."
-            icon={Monitor}
-          />
-          <div className="dash-panel overflow-x-auto rounded-xl border border-[var(--border)] p-4 sm:p-6">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--text-primary)] sm:text-lg">Platform comparison</h2>
+            <p className="mt-1 max-w-2xl text-xs text-[var(--text-tertiary)] leading-relaxed">
+              Side-by-side Desktop vs mWeb. Use the platform switcher at the top of the page to load either full report.
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]">
             <table className="w-full min-w-[320px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th className="py-3 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                <tr className="border-b border-[var(--border)] bg-white/[0.02]">
+                  <th className="px-4 py-4 text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
                     Metric
                   </th>
-                  <th className="px-2 py-3 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[rgba(99,102,241,0.12)] px-2.5 py-1.5 text-xs font-bold tracking-wide text-[var(--text-primary)]"
-                        title="This column is the Desktop scan"
-                      >
-                        <Monitor className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
-                        Desktop
-                      </span>
-                      <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
-                        {truncateUrl(scan.target_url, 44)}
-                      </span>
-                      {scanGroupPair.desktop && scanGroupPair.desktop.status !== 'completed' && (
-                        <span className="text-[10px] font-medium text-amber-400/90">{statusLabel(scanGroupPair.desktop.status)}</span>
-                      )}
-                    </div>
+                  <th className="px-4 py-4 text-center" title="Desktop">
+                    <Monitor className="mx-auto h-5 w-5 text-violet-300" aria-label="Desktop" />
                   </th>
-                  <th className="px-2 py-3 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[rgba(99,102,241,0.12)] px-2.5 py-1.5 text-xs font-bold tracking-wide text-[var(--text-primary)]"
-                        title="This column is the mobile web (mWeb) scan"
-                      >
-                        <Smartphone className="h-3.5 w-3.5 shrink-0 text-violet-300" aria-hidden />
-                        mWeb
-                      </span>
-                      <span className="max-w-[12rem] truncate text-[10px] font-normal text-[var(--text-tertiary)]" title={scan.target_url}>
-                        {truncateUrl(scan.target_url, 44)}
-                      </span>
-                      {scanGroupPair.mweb && scanGroupPair.mweb.status !== 'completed' && (
-                        <span className="text-[10px] font-medium text-amber-400/90">{statusLabel(scanGroupPair.mweb.status)}</span>
-                      )}
-                    </div>
+                  <th className="px-4 py-4 text-center" title="mWeb">
+                    <Smartphone className="mx-auto h-5 w-5 text-violet-300" aria-label="mWeb" />
                   </th>
                 </tr>
               </thead>
               <tbody className="text-[var(--text-secondary)]">
                 {(
                   [
-                    { label: 'Overall KPI', dKey: 'overall_score' as const },
-                    { label: 'Security (40%)', dKey: 'security_score' as const },
-                    { label: 'Performance (35%)', dKey: 'performance_score' as const },
-                    { label: 'Code quality (25%)', dKey: 'code_quality_score' as const },
+                    { label: 'Overall KPI', w: null as string | null, dKey: 'overall_score' as const },
+                    { label: 'Security', w: '40%', dKey: 'security_score' as const },
+                    { label: 'Performance', w: '35%', dKey: 'performance_score' as const },
+                    { label: 'Code quality', w: '25%', dKey: 'code_quality_score' as const },
                   ] as const
                 ).map((row) => (
-                  <tr key={row.label} className="border-b border-[var(--border)]/80 last:border-0">
-                    <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">{row.label}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">
+                  <tr key={row.label} className="border-b border-[var(--border)]/70 last:border-0">
+                    <td className="px-4 py-4 pr-6 align-middle">
+                      <span className="font-medium text-[var(--text-primary)]">{row.label}</span>
+                      {row.w && <span className="ml-1.5 text-[10px] font-medium text-zinc-500">({row.w})</span>}
+                    </td>
+                    <td className="px-4 py-4 text-right text-base tabular-nums">
                       {scanGroupPair.desktop ? (
                         <span className={`font-semibold ${scoreValueClass(Number(scanGroupPair.desktop[row.dKey] ?? 0))}`}>
                           {Number(scanGroupPair.desktop[row.dKey] ?? 0).toFixed(1)}
@@ -604,7 +811,7 @@ export default function Overview() {
                         <span className="text-zinc-500">—</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-right tabular-nums">
+                    <td className="px-4 py-4 text-right text-base tabular-nums">
                       {scanGroupPair.mweb ? (
                         <span className={`font-semibold ${scoreValueClass(Number(scanGroupPair.mweb[row.dKey] ?? 0))}`}>
                           {Number(scanGroupPair.mweb[row.dKey] ?? 0).toFixed(1)}
@@ -615,9 +822,9 @@ export default function Overview() {
                     </td>
                   </tr>
                 ))}
-                <tr className="border-b border-[var(--border)]/80 last:border-0">
-                  <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">Critical findings</td>
-                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                <tr className="border-b border-[var(--border)]/70 last:border-0">
+                  <td className="px-4 py-4 font-medium text-[var(--text-primary)]">Critical findings</td>
+                  <td className="px-4 py-4 text-right tabular-nums text-base font-semibold">
                     {scanGroupPair.desktop ? (
                       <span className={countSeverity(scanGroupPair.desktop.findings, 'CRITICAL') > 0 ? 'text-red-400' : 'text-zinc-500'}>
                         {countSeverity(scanGroupPair.desktop.findings, 'CRITICAL')}
@@ -626,7 +833,7 @@ export default function Overview() {
                       <span className="text-zinc-500">—</span>
                     )}
                   </td>
-                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                  <td className="px-4 py-4 text-right tabular-nums text-base font-semibold">
                     {scanGroupPair.mweb ? (
                       <span className={countSeverity(scanGroupPair.mweb.findings, 'CRITICAL') > 0 ? 'text-red-400' : 'text-zinc-500'}>
                         {countSeverity(scanGroupPair.mweb.findings, 'CRITICAL')}
@@ -637,8 +844,8 @@ export default function Overview() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-3 pr-4 font-medium text-[var(--text-primary)]">High findings</td>
-                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                  <td className="px-4 py-4 font-medium text-[var(--text-primary)]">High findings</td>
+                  <td className="px-4 py-4 text-right tabular-nums text-base font-semibold">
                     {scanGroupPair.desktop ? (
                       <span className={countSeverity(scanGroupPair.desktop.findings, 'HIGH') > 0 ? 'text-amber-400' : 'text-zinc-500'}>
                         {countSeverity(scanGroupPair.desktop.findings, 'HIGH')}
@@ -647,7 +854,7 @@ export default function Overview() {
                       <span className="text-zinc-500">—</span>
                     )}
                   </td>
-                  <td className="px-2 py-3 text-right tabular-nums font-semibold">
+                  <td className="px-4 py-4 text-right tabular-nums text-base font-semibold">
                     {scanGroupPair.mweb ? (
                       <span className={countSeverity(scanGroupPair.mweb.findings, 'HIGH') > 0 ? 'text-amber-400' : 'text-zinc-500'}>
                         {countSeverity(scanGroupPair.mweb.findings, 'HIGH')}
@@ -663,50 +870,6 @@ export default function Overview() {
         </motion.div>
       )}
 
-      {/* KPI — measure tiles (Sonar-style) + gauge breakdown */}
-      <motion.div custom={0} variants={fadeIn} initial="hidden" animate="visible" className="space-y-6">
-        <DashboardSectionHeader
-          eyebrow="Measures"
-          title="Quality gate & scores"
-          description={`PASS only when overall is at least ${passThreshold}. Weights: security 40%, performance 35%, code quality 25%.`}
-          icon={Sparkles}
-        />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-          <MetricTile
-            label="Overall KPI"
-            score={overallScore}
-            accent="violet"
-            badge={{ text: overallPass ? 'Pass' : 'Fail', ok: overallPass }}
-            hint={`Target ≥ ${passThreshold}`}
-          />
-          <MetricTile label="Security" score={securityScore} accent="red" hint="Weight 40%" />
-          <MetricTile label="Performance" score={performanceScore} accent="cyan" hint="Weight 35%" />
-          <MetricTile label="Code quality" score={codeQualityScore} accent="emerald" hint="Weight 25%" />
-        </div>
-
-        <div className="dash-panel p-5 sm:p-7">
-          <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
-            Breakdown
-          </p>
-          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
-            <div className="flex shrink-0 flex-col items-center">
-              <ScoreGauge score={overallScore} label="Overall KPI" size="lg" subtitle={overallPass ? 'PASS' : 'FAIL'} />
-            </div>
-            <div className="grid w-full max-w-xl grid-cols-1 gap-8 sm:max-w-none sm:grid-cols-3 sm:gap-6">
-              <div className="flex justify-center">
-                <ScoreGauge score={securityScore} label="Security (40%)" size="md" />
-              </div>
-              <div className="flex justify-center">
-                <ScoreGauge score={performanceScore} label="Performance (35%)" size="md" />
-              </div>
-              <div className="flex justify-center">
-                <ScoreGauge score={codeQualityScore} label="Code Quality (25%)" size="md" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
       {/* Score Trend — lazy chart chunk for faster initial paint */}
       {scan.score_history && scan.score_history.length > 1 && (
         <Suspense fallback={<ChartFallback height={300} />}>
@@ -715,7 +878,7 @@ export default function Overview() {
       )}
 
       {/* AI Recommendations + Quick Wins */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-12">
         <motion.div custom={1} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-6 sm:p-9">
           <div className="mb-8 space-y-2">
             <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2.5">
@@ -760,9 +923,10 @@ export default function Overview() {
 
       {/* Projected Score */}
       <motion.div custom={3} variants={fadeIn} initial="hidden" animate="visible" className="card p-6 sm:p-8">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Projected Score After Fixes</h3>
-        <p className="text-xs text-[var(--text-tertiary)] mb-5 leading-relaxed">
-          Overall KPI projected: <strong className="text-violet-400">{projectedOverall.toFixed(1)}</strong>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Projected score after fixes</h3>
+        <p className="mb-4 text-xs leading-relaxed text-[var(--text-tertiary)]">
+          Illustrative only: sums suggested gains from recommendations — not a measured or guaranteed outcome.{' '}
+          Blended overall shown here: <strong className="text-violet-400 tabular-nums">{projectedOverall.toFixed(1)}</strong>
         </p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={projectedData} barGap={4} margin={{ left: -10 }}>
@@ -814,7 +978,7 @@ export default function Overview() {
       </motion.div>
 
       {/* Findings + Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
         <motion.div custom={5} variants={fadeIn} initial="hidden" animate="visible" className="lg:col-span-2 card p-6 sm:p-8">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">

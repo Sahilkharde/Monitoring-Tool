@@ -757,6 +757,13 @@ export default function ControlCenter() {
                   <div className="space-y-4">
                     {/* Progress bar */}
                     <div className="card rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
+                      <p className="mb-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
+                        Security, then Performance, then Code quality run <span className="text-[var(--text-secondary)]">in sequence</span>. With{' '}
+                        <span className="text-[var(--text-secondary)]">GOOGLE_PAGESPEED_API_KEY</span> set, performance uses{' '}
+                        <strong className="text-[var(--text-primary)]">real Google PageSpeed Insights (Lighthouse)</strong> — expect roughly{' '}
+                        <span className="text-[var(--text-secondary)]">1–3 minutes</span> for a full run; “Both” (Desktop + mWeb) runs two full
+                        scans one after the other.
+                      </p>
                       <div className="mb-2 flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
                         <span className="text-sm font-medium text-[var(--accent)]">Scanning...</span>
